@@ -42,7 +42,7 @@ export default function LoginPage() {
 
           {/* GitHub */}
           <Button
-            className="w-full mb-4"
+            className="w-full mb-4 bg-zinc-800 border-zinc-600 text-zinc-100 hover:bg-zinc-700"
             variant="outline"
             onClick={handleGitHub}
             disabled={loading !== null}

@@ -3,8 +3,10 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import GitHub from "next-auth/providers/github";
 import Nodemailer from "next-auth/providers/nodemailer";
 import { prisma } from "@/lib/prisma";
+import { authConfig } from "@/auth.config";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  ...authConfig,
   adapter: PrismaAdapter(prisma),
   providers: [
     GitHub({
@@ -17,18 +19,27 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }),
   ],
   session: {
-    strategy: "database",
-  },
-  pages: {
-    signIn: "/login",
-    error: "/login",
+    strategy: "jwt",
   },
   callbacks: {
-    async session({ session, user }) {
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id;
+        // Fetch role + orgId from DB on first sign-in
+        const dbUser = await prisma.user.findUnique({
+          where: { id: user.id },
+          select: { role: true, orgId: true },
+        });
+        token.role = dbUser?.role;
+        token.orgId = dbUser?.orgId;
+      }
+      return token;
+    },
+    async session({ session, token }) {
       if (session.user) {
-        session.user.id = user.id;
-        (session.user as { role?: string }).role = (user as { role?: string }).role;
-        (session.user as { orgId?: string | null }).orgId = (user as { orgId?: string | null }).orgId;
+        session.user.id = token.id as string;
+        (session.user as { role?: string }).role = token.role as string;
+        (session.user as { orgId?: string | null }).orgId = token.orgId as string | null;
       }
       return session;
     },
