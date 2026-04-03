@@ -1,4 +1,5 @@
 import { scanCode } from "./index";
+import { analyzeProjectGraph } from "./project-graph";
 import type { Finding, Language } from "./types";
 
 const SCANNABLE_EXTENSIONS: Record<string, Language> = {
@@ -99,6 +100,13 @@ export async function scanFiles(
       }
     }
   }
+
+  // ── Project-graph analysis ──────────────────────────────────────────────────
+  // Cross-file semantic rules: IDOR, server-action auth bypass, middleware gaps,
+  // mass assignment, secret leaks via client imports.
+  // These are impossible to detect with per-file pattern matching alone.
+  const graphFindings = analyzeProjectGraph(limited);
+  allFindings.push(...graphFindings);
 
   return { allFindings, linesScanned, fileCount: limited.length };
 }
