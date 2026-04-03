@@ -2,7 +2,8 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Shield, Upload, Code2, GitBranch, AlertTriangle, CheckCircle, Clock } from "lucide-react";
+import { Shield, Upload, Code2, AlertTriangle, CheckCircle, Clock } from "lucide-react";
+import GitHubIcon from "@/components/icons/GitHubIcon";
 
 const btn = "inline-flex items-center justify-center rounded-lg bg-primary text-primary-foreground px-2.5 py-1.5 text-[0.8rem] font-medium transition-colors hover:bg-primary/80";
 const btnOutline = "inline-flex items-center justify-center rounded-lg border border-zinc-700 bg-transparent text-zinc-200 px-2.5 py-1.5 text-[0.8rem] font-medium transition-colors hover:bg-zinc-800";
@@ -97,7 +98,7 @@ export default async function DashboardPage() {
               Upload
             </Link>
             <Link href="/scan/github" className={btn}>
-              <GitBranch className="h-3.5 w-3.5 mr-1.5" />
+              <GitHubIcon className="h-3.5 w-3.5 mr-1.5" />
               GitHub repo
             </Link>
           </div>
