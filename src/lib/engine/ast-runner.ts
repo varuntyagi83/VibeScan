@@ -1,33 +1,12 @@
 import type { Finding, RawRule } from "./types";
 
-// AST-based heuristics implemented as targeted regex/structural patterns.
-// Full tree-sitter integration is a Phase 2 upgrade; these patterns have
-// very low false-positive rates on real AI-generated code.
-
-interface AstPattern {
-  call?: string | string[];
-  node?: string;
-  prop?: string;
-  identifier?: string;
-  argSource?: string[];
-  argContains?: string[];
-  argType?: string;
-  missing?: string[];
-  missingPair?: string;
-  missingFlags?: string[];
-  missingAuth?: boolean;
-  missingValidation?: boolean;
-  directResponse?: boolean;
-  corsConfig?: Record<string, unknown>;
-  valueSource?: string[];
-  context?: string;
-  responseContains?: string[];
-  method?: string;
-}
+// AST-based heuristics: targeted structural patterns that understand code context.
+// Each matcher receives the full file code, split lines, and file path for
+// path-aware analysis. Returns 0-indexed line numbers where the issue is found.
 
 function getSnippet(lines: string[], lineIndex: number): string {
-  const start = Math.max(0, lineIndex - 1);
-  const end = Math.min(lines.length - 1, lineIndex + 1);
+  const start = Math.max(0, lineIndex - 2);
+  const end = Math.min(lines.length - 1, lineIndex + 2);
   return lines.slice(start, end + 1).join("\n");
 }
 
@@ -35,278 +14,241 @@ function makeRegex(patterns: string[]): RegExp {
   return new RegExp(patterns.join("|"), "i");
 }
 
-// Per-rule heuristic matchers
+/** Is this file a React client component? */
+function isClientComponent(code: string): boolean {
+  return /^\s*['"]use client['"]/m.test(code);
+}
+
+/** Is this file a Next.js API route? */
+function isApiRoute(filePath: string): boolean {
+  return /\/api\//.test(filePath) || /route\.[jt]sx?$/.test(filePath);
+}
+
+/** Is this path an intentionally public/unauthenticated endpoint? */
+function isPublicApiPath(filePath: string): boolean {
+  return /\/api\/auth\/|\/api\/webhooks?\/|\/api\/public\/|\/api\/health|\/api\/ping|\/api\/oauth/.test(
+    filePath
+  );
+}
+
+/** Is this file a test or fixture? Skip it. */
+function isTestFile(filePath: string): boolean {
+  return /\.(test|spec)\.[jt]sx?$|__tests__|fixtures?\/|mocks?\//i.test(filePath);
+}
+
+/** Find all 0-indexed lines matching a regex */
+function matchLines(lines: string[], re: RegExp): number[] {
+  return lines.reduce<number[]>((acc, line, i) => {
+    if (re.test(line)) acc.push(i);
+    return acc;
+  }, []);
+}
+
+// ─── Per-rule matchers ────────────────────────────────────────────────────────
+
 const AST_MATCHERS: Record<
   string,
-  (code: string, lines: string[]) => number[]
+  (code: string, lines: string[], filePath: string) => number[]
 > = {
-  "supabase-key-client": (code) => {
-    // Service role key used with createClient in any non-API context
-    const matches: number[] = [];
-    const lines = code.split("\n");
-    lines.forEach((line, i) => {
-      if (
-        /SUPABASE_SERVICE_ROLE_KEY/i.test(line) &&
-        !/\/\/ server-only|api route/i.test(line)
-      ) {
-        matches.push(i);
-      }
-    });
-    return matches;
+  // ── Secrets ──────────────────────────────────────────────────────────────
+
+  "supabase-key-client": (code, lines, filePath) => {
+    // Service role key used outside of server-only files
+    if (isTestFile(filePath)) return [];
+    if (isApiRoute(filePath)) return []; // allowed in API routes
+    return matchLines(lines, /SUPABASE_SERVICE_ROLE_KEY/i);
   },
 
-  "env-in-client": (code) => {
-    const matches: number[] = [];
-    const lines = code.split("\n");
-    const isClientFile =
-      /['"]use client['"]/i.test(code) ||
-      /^(import|export).*from ['"]react['"]/m.test(code);
-    if (!isClientFile) return [];
-    lines.forEach((line, i) => {
-      if (
-        /process\.env\.[A-Z_]+/.test(line) &&
-        !/NEXT_PUBLIC_/.test(line) &&
-        !/\/\//.test(line.trim().slice(0, 2))
-      ) {
-        matches.push(i);
-      }
-    });
-    return matches;
+  "env-in-client": (code, lines, filePath) => {
+    // process.env without NEXT_PUBLIC_ in a client component
+    if (!isClientComponent(code)) return [];
+    if (isApiRoute(filePath)) return [];
+    return matchLines(
+      lines,
+      /process\.env\.(?!NEXT_PUBLIC_)[A-Z_]+/
+    ).filter((i) => !/^\s*\/\//.test(lines[i]));
   },
 
-  "missing-auth-api": (code) => {
-    // Route handler that exports GET/POST without any auth check
+  // ── Authentication ────────────────────────────────────────────────────────
+
+  "missing-auth-api": (code, lines, filePath) => {
+    // Route handler without any recognisable auth check
+    if (isTestFile(filePath)) return [];
+    if (!isApiRoute(filePath)) return [];
+    if (isPublicApiPath(filePath)) return [];
+
     const hasHandler =
       /export\s+(async\s+)?function\s+(GET|POST|PUT|DELETE|PATCH)/m.test(code);
     if (!hasHandler) return [];
-    const hasAuth = makeRegex([
-      "getServerSession",
-      "auth\\(\\)",
-      "getUser",
-      "currentUser",
-      "verifyToken",
-      "requireAuth",
-      "session\\.user",
+
+    const AUTH_PATTERNS = [
+      // next-auth v4 / v5
+      "getServerSession", "auth\\(\\)",
+      // Supabase
+      "getUser\\(", "supabase\\.auth\\.",
+      // Clerk
+      "currentUser\\(", "getAuth\\(", "clerkClient", "auth\\(\\)\\.userId",
+      // Lucia / custom
+      "validateSession", "locals\\.user", "checkAuth", "requireAuth",
+      "withAuth", "isAuthenticated", "ensureAuth",
+      // Session / JWT
+      "session\\.user", "session\\.userId", "token\\.sub",
+      "verifyToken", "verifyJwt", "jwt\\.verify",
+    ];
+    if (makeRegex(AUTH_PATTERNS).test(code)) return [];
+
+    // Only flag if the route touches sensitive data (skip static GET-only routes)
+    const hasSensitiveOp = makeRegex([
+      "request\\.json", "req\\.body", "request\\.formData",
+      "prisma\\.", "\\.create\\(", "\\.update\\(", "\\.delete\\(",
+      "\\.findUnique\\(", "\\.findMany\\(", "\\.findFirst\\(",
+      "db\\.", "supabase\\.", "DELETE|UPDATE|INSERT",
     ]).test(code);
-    if (hasAuth) return [];
-    // Return line number of the handler
-    const lines = code.split("\n");
+
+    const isGetOnly =
+      /export\s+(async\s+)?function\s+GET/.test(code) &&
+      !/export\s+(async\s+)?function\s+(POST|PUT|DELETE|PATCH)/.test(code);
+
+    if (isGetOnly && !hasSensitiveOp) return [];
+
     const idx = lines.findIndex((l) =>
       /export\s+(async\s+)?function\s+(GET|POST|PUT|DELETE|PATCH)/.test(l)
     );
     return idx >= 0 ? [idx] : [];
   },
 
-  "jwt-no-verify": (code) => {
+  "jwt-no-verify": (code, lines) => {
     if (!/jwt\.decode\(/i.test(code)) return [];
     if (/jwt\.verify\(/i.test(code)) return [];
-    const lines = code.split("\n");
-    return lines.reduce<number[]>((acc, line, i) => {
-      if (/jwt\.decode\(/i.test(line)) acc.push(i);
-      return acc;
-    }, []);
+    return matchLines(lines, /jwt\.decode\(/i);
   },
 
-  "sql-interpolation": (code) => {
-    const matches: number[] = [];
-    const lines = code.split("\n");
-    lines.forEach((line, i) => {
-      if (
-        /\.(query|raw|execute)\s*\(/.test(line) &&
-        /`[^`]*\$\{/.test(line)
-      ) {
-        matches.push(i);
-      }
-    });
-    return matches;
-  },
-
-  "nosql-injection": (code) => {
-    const matches: number[] = [];
-    const lines = code.split("\n");
-    lines.forEach((line, i) => {
-      if (
-        /\.(find|findOne|updateOne|deleteOne)\s*\(/.test(line) &&
-        /req\.(body|query|params)/.test(line)
-      ) {
-        matches.push(i);
-      }
-    });
-    return matches;
-  },
-
-  "xss-dangerously": (code) => {
-    const matches: number[] = [];
-    const lines = code.split("\n");
-    lines.forEach((line, i) => {
-      if (/dangerouslySetInnerHTML/.test(line) && /\{/.test(line)) {
-        matches.push(i);
-      }
-    });
-    return matches;
-  },
-
-  "eval-usage": (code) => {
-    const matches: number[] = [];
-    const lines = code.split("\n");
-    lines.forEach((line, i) => {
-      if (
-        /\beval\s*\(/.test(line) ||
-        /new\s+Function\s*\(/.test(line)
-      ) {
-        matches.push(i);
-      }
-    });
-    return matches;
-  },
-
-  "command-injection": (code) => {
-    const matches: number[] = [];
-    const lines = code.split("\n");
-    lines.forEach((line, i) => {
-      if (
-        /\b(exec|execSync|spawn|spawnSync)\s*\(/.test(line) &&
-        /`[^`]*\$\{/.test(line)
-      ) {
-        matches.push(i);
-      }
-    });
-    return matches;
-  },
-
-  "cors-credentials-wildcard": (code) => {
+  "cors-credentials-wildcard": (code, lines) => {
     const hasCreds = /credentials\s*:\s*true/i.test(code);
     const hasWildcard =
       /origin\s*:\s*['"]?\*['"]?/.test(code) ||
       /origin\s*:\s*true/i.test(code);
     if (!hasCreds || !hasWildcard) return [];
-    const lines = code.split("\n");
     const idx = lines.findIndex((l) => /credentials\s*:\s*true/i.test(l));
     return idx >= 0 ? [idx] : [];
   },
 
-  "full-error-client": (code) => {
-    const matches: number[] = [];
-    const lines = code.split("\n");
-    lines.forEach((line, i) => {
-      if (
-        /catch\s*\(/.test(line) ||
-        (/json\s*\(/.test(line) &&
-          /error\.(stack|message)|e\.(stack|message)/.test(line))
-      ) {
-        if (/error\.(stack|message)|e\.(stack|message)/.test(line)) {
-          matches.push(i);
-        }
-      }
-    });
-    return matches;
+  // ── Injection ─────────────────────────────────────────────────────────────
+
+  "sql-interpolation": (code, lines) => {
+    return matchLines(
+      lines,
+      /\.(query|raw|execute)\s*\(`[^`]*\$\{/
+    );
   },
 
-  "console-log-sensitive": (code) => {
-    const matches: number[] = [];
-    const lines = code.split("\n");
+  "nosql-injection": (code, lines) => {
+    return matchLines(
+      lines,
+      /\.(find|findOne|updateOne|deleteOne)\s*\([^)]*req\.(body|query|params)/
+    );
+  },
+
+  "xss-dangerously": (code, lines) => {
+    // Only flag when the value comes from a variable, not a hardcoded string
+    return matchLines(lines, /dangerouslySetInnerHTML\s*=\s*\{\s*\{/).filter(
+      (i) => {
+        const snippet = lines.slice(i, Math.min(lines.length, i + 3)).join(" ");
+        // Skip if the value is a hardcoded string literal
+        return !/__html\s*:\s*['"`][^'"`]*['"`]/.test(snippet);
+      }
+    );
+  },
+
+  "eval-usage": (code, lines) => {
+    return matchLines(lines, /\beval\s*\(|new\s+Function\s*\(/);
+  },
+
+  "command-injection": (code, lines) => {
+    // exec/spawn with a template literal (interpolated argument = injection risk)
+    return matchLines(
+      lines,
+      /\b(exec|execSync|spawn|spawnSync)\s*\(`[^`]*\$\{/
+    );
+  },
+
+  // ── Data exposure ─────────────────────────────────────────────────────────
+
+  "full-error-client": (code, lines) => {
+    return matchLines(
+      lines,
+      /(?:error|err|e)\.(stack|message)\b/
+    ).filter((i) => {
+      // Must be inside a response / json call context
+      const block = lines
+        .slice(Math.max(0, i - 3), Math.min(lines.length, i + 3))
+        .join(" ");
+      return /(?:json|send|write|response)\s*\(/.test(block);
+    });
+  },
+
+  "console-log-sensitive": (code, lines) => {
     const sensitiveVars =
-      /password|token|secret|apikey|api_key|credential|private_key/i;
-    lines.forEach((line, i) => {
-      if (/console\.log\s*\(/.test(line) && sensitiveVars.test(line)) {
-        matches.push(i);
-      }
-    });
-    return matches;
+      /password|token|secret|apikey|api_key|credential|private_?key|bearer/i;
+    return matchLines(lines, /console\.log\s*\(/).filter((i) =>
+      sensitiveVars.test(lines[i])
+    );
   },
 
-  "unfiltered-query": (code) => {
-    const matches: number[] = [];
-    const lines = code.split("\n");
-    lines.forEach((line, i) => {
-      if (/\.select\s*\(\s*['"`]\*['"`]\s*\)/.test(line)) {
-        matches.push(i);
-      }
-    });
-    return matches;
+  "unfiltered-query": (code, lines) => {
+    return matchLines(lines, /\.select\s*\(\s*['"`]\*['"`]\s*\)/);
   },
 
-  "no-input-validation": (code) => {
-    // API route that reads req body/query without zod/joi/yup
+  // ── Config ────────────────────────────────────────────────────────────────
+
+  "no-input-validation": (code, lines, filePath) => {
+    if (!isApiRoute(filePath)) return [];
     const hasHandler =
-      /export\s+(async\s+)?function\s+(GET|POST|PUT|DELETE|PATCH)/m.test(code);
+      /export\s+(async\s+)?function\s+(POST|PUT|PATCH|DELETE)/m.test(code);
     if (!hasHandler) return [];
     const hasValidation =
-      /\.parse\s*\(|\.safeParse\s*\(|\.validate\s*\(|z\.\w|joi\.|yup\./i.test(
+      /\.parse\s*\(|\.safeParse\s*\(|\.validate\s*\(|z\.\w|joi\.|yup\.|ajv/i.test(
         code
       );
     if (hasValidation) return [];
-    const hasBodyRead =
-      /request\.json\(\)|req\.body|await request\.formData/.test(code);
+    const hasBodyRead = /request\.json\(\)|req\.body|await request\.formData/.test(code);
     if (!hasBodyRead) return [];
-    const lines = code.split("\n");
     const idx = lines.findIndex((l) =>
       /request\.json\(\)|req\.body|await request\.formData/.test(l)
     );
     return idx >= 0 ? [idx] : [];
   },
 
-  "unvalidated-redirect": (code) => {
-    const matches: number[] = [];
-    const lines = code.split("\n");
-    lines.forEach((line, i) => {
-      if (
-        /\b(redirect|router\.push|Response\.redirect)\s*\(/.test(line) &&
-        /searchParams|req\.query|req\.body|params\[/.test(line)
-      ) {
-        matches.push(i);
-      }
-    });
-    return matches;
+  "unvalidated-redirect": (code, lines) => {
+    return matchLines(
+      lines,
+      /\b(?:redirect|router\.push|Response\.redirect)\s*\([^)]*(?:searchParams|req\.query|req\.body|params\[)/
+    );
   },
 
-  "insecure-cookie": (code) => {
-    const matches: number[] = [];
-    const lines = code.split("\n");
-    lines.forEach((line, i) => {
-      if (/cookies\(\)\.(set|append)|setCookie\s*\(/.test(line)) {
-        // Check nearby lines for missing flags
-        const block = lines
-          .slice(i, Math.min(lines.length, i + 5))
-          .join("\n");
-        const hasHttpOnly = /httpOnly\s*:\s*true/i.test(block);
-        const hasSecure = /secure\s*:\s*true/i.test(block);
-        if (!hasHttpOnly || !hasSecure) {
-          matches.push(i);
-        }
-      }
+  "insecure-cookie": (code, lines) => {
+    return matchLines(lines, /cookies\(\)\.(set|append)\s*\(|setCookie\s*\(/).filter((i) => {
+      const block = lines
+        .slice(i, Math.min(lines.length, i + 6))
+        .join("\n");
+      const hasHttpOnly = /httpOnly\s*:\s*true/i.test(block);
+      const hasSecure = /secure\s*:\s*true/i.test(block);
+      return !hasHttpOnly || !hasSecure;
     });
-    return matches;
   },
 
-  "no-csrf": (code) => {
-    const matches: number[] = [];
-    const lines = code.split("\n");
-    lines.forEach((line, i) => {
-      if (
-        /<form[^>]*method\s*=\s*['"]?post/i.test(line) &&
-        !/(csrf|_token|csrfToken)/i.test(code)
-      ) {
-        matches.push(i);
-      }
-    });
-    return matches;
+  "no-csrf": (code, lines) => {
+    if (/(csrf|_token|csrfToken|SameSite)/i.test(code)) return [];
+    return matchLines(lines, /<form[^>]*method\s*=\s*['"]?post/i);
   },
 
-  "missing-rls": (code) => {
-    const matches: number[] = [];
-    const lines = code.split("\n");
-    lines.forEach((line, i) => {
-      if (
-        /supabase\.from\s*\(/.test(line) &&
-        /service_role|serviceRole|SERVICE_ROLE/i.test(code)
-      ) {
-        matches.push(i);
-      }
-    });
-    return matches;
+  "missing-rls": (code, lines) => {
+    if (!/service_role|serviceRole|SERVICE_ROLE/i.test(code)) return [];
+    return matchLines(lines, /supabase\.from\s*\(/);
   },
 };
+
+// ─── Public runner ────────────────────────────────────────────────────────────
 
 export function runAstRule(
   rule: RawRule,
@@ -317,7 +259,7 @@ export function runAstRule(
   if (!matcher) return [];
 
   const lines = code.split("\n");
-  const matchedLines = matcher(code, lines);
+  const matchedLines = matcher(code, lines, filePath); // ← filePath now passed
 
   return matchedLines.map((lineIdx) => ({
     ruleId: rule.id,

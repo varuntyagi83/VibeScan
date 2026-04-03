@@ -21,10 +21,19 @@ export function runRegexRule(
     return [];
   }
 
+  // Skip test/fixture files — high false-positive rate
+  if (/\.(test|spec)\.[jt]sx?$|__tests__|\/fixtures?\/|\/mocks?\//i.test(filePath)) {
+    return [];
+  }
+
   const lines = code.split("\n");
   const findings: Finding[] = [];
 
   lines.forEach((line, idx) => {
+    // Skip comment lines
+    const trimmed = line.trim();
+    if (trimmed.startsWith("//") || trimmed.startsWith("*") || trimmed.startsWith("/*")) return;
+
     regex.lastIndex = 0;
     if (regex.test(line)) {
       findings.push({
