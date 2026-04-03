@@ -6,6 +6,7 @@ import { Shield, ArrowLeft, CheckCircle, Clock, AlertTriangle, GitCompareArrows 
 import { Suspense } from "react";
 import ScanFilters from "./ScanFilters";
 import DeleteScanButton from "./DeleteScanButton";
+import AppHeader from "@/components/AppHeader";
 
 function GradeBadge({ grade }: { grade: string | null | undefined }) {
   const colors: Record<string, string> = {
@@ -66,20 +67,11 @@ export default async function ScansPage({ searchParams }: { searchParams: Search
     include: { summary: true },
   });
 
+  const isAdmin = (session.user as { role?: string }).role === "ADMIN";
+
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="border-b border-zinc-800 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Shield className="h-5 w-5 text-red-500" />
-          <span className="font-bold tracking-tight">VibeScan</span>
-        </div>
-        <div className="flex items-center gap-3 text-sm text-zinc-400">
-          <span>{session.user.email}</span>
-          <Link href="/api/auth/signout" className="hover:text-zinc-200 transition-colors">
-            Sign out
-          </Link>
-        </div>
-      </header>
+      <AppHeader email={session.user.email} isAdmin={isAdmin} nav="scans" />
 
       <main className="flex-1 px-6 py-8 max-w-5xl mx-auto w-full">
         <div className="flex items-center justify-between mb-6">

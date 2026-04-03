@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Shield, Upload, Code2, AlertTriangle, CheckCircle, Clock, ArrowRight } from "lucide-react";
 import GitHubIcon from "@/components/icons/GitHubIcon";
 import DashboardCharts from "@/components/dashboard/DashboardCharts";
+import AppHeader from "@/components/AppHeader";
 
 const btn = "inline-flex items-center justify-center rounded-lg bg-primary text-primary-foreground px-2.5 py-1.5 text-[0.8rem] font-medium transition-colors hover:bg-primary/80";
 const btnOutline = "inline-flex items-center justify-center rounded-lg border border-zinc-700 bg-transparent text-zinc-200 px-2.5 py-1.5 text-[0.8rem] font-medium transition-colors hover:bg-zinc-800";
@@ -94,30 +95,11 @@ export default async function DashboardPage() {
     count: g._count.id,
   }));
 
+  const isAdmin = (session.user as { role?: string }).role === "ADMIN";
+
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Top nav */}
-      <header className="border-b border-zinc-800 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Shield className="h-5 w-5 text-red-500" />
-          <span className="font-bold tracking-tight">VibeScan</span>
-        </div>
-        <div className="flex items-center gap-3 text-sm">
-          <Link href="/scans" className="text-zinc-400 hover:text-zinc-200 transition-colors">
-            All scans
-          </Link>
-          <Link href="/rules" className="text-zinc-400 hover:text-zinc-200 transition-colors">
-            Rules
-          </Link>
-          <Link href="/integrations" className="text-zinc-400 hover:text-zinc-200 transition-colors">
-            Integrations
-          </Link>
-          <span className="text-zinc-400">{session.user.email}</span>
-          <Link href="/api/auth/signout" className="text-zinc-500 hover:text-zinc-200 transition-colors">
-            Sign out
-          </Link>
-        </div>
-      </header>
+      <AppHeader email={session.user.email} isAdmin={isAdmin} nav="dashboard" />
 
       <main className="flex-1 px-6 py-8 max-w-5xl mx-auto w-full">
         <div className="flex items-center justify-between mb-8">

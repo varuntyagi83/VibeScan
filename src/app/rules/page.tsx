@@ -2,9 +2,10 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Shield, ArrowLeft, BookOpen } from "lucide-react";
+import { ArrowLeft, BookOpen } from "lucide-react";
 import { Suspense } from "react";
 import RulesFilters from "./RulesFilters";
+import AppHeader from "@/components/AppHeader";
 
 const SEV_COLORS: Record<string, string> = {
   CRITICAL: "bg-red-950 border-red-800 text-red-400",
@@ -62,18 +63,7 @@ export default async function RulesPage({ searchParams }: { searchParams: Search
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="border-b border-zinc-800 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Shield className="h-5 w-5 text-red-500" />
-          <span className="font-bold tracking-tight">VibeScan</span>
-        </div>
-        <div className="flex items-center gap-3 text-sm text-zinc-400">
-          <span>{session.user.email}</span>
-          <Link href="/api/auth/signout" className="hover:text-zinc-200 transition-colors">
-            Sign out
-          </Link>
-        </div>
-      </header>
+      <AppHeader email={session.user.email} nav="rules" />
 
       <main className="flex-1 px-6 py-8 max-w-5xl mx-auto w-full">
         <Link

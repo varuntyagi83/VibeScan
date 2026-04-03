@@ -2,8 +2,9 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Shield, ArrowLeft, GitBranch } from "lucide-react";
+import { ArrowLeft, GitBranch } from "lucide-react";
 import ConnectRepoForm from "./ConnectRepoForm";
+import AppHeader from "@/components/AppHeader";
 
 export default async function IntegrationsPage() {
   const session = await auth();
@@ -18,18 +19,7 @@ export default async function IntegrationsPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="border-b border-zinc-800 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Shield className="h-5 w-5 text-red-500" />
-          <span className="font-bold tracking-tight">VibeScan</span>
-        </div>
-        <div className="flex items-center gap-3 text-sm text-zinc-400">
-          <span>{session.user.email}</span>
-          <Link href="/api/auth/signout" className="hover:text-zinc-200 transition-colors">
-            Sign out
-          </Link>
-        </div>
-      </header>
+      <AppHeader email={session.user.email} nav="integrations" />
 
       <main className="flex-1 px-6 py-8 max-w-3xl mx-auto w-full">
         <Link

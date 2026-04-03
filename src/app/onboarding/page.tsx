@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { Shield, FileCode, Upload, BookOpen, GitBranch } from "lucide-react";
 import GitHubIcon from "@/components/icons/GitHubIcon";
+import AppHeader from "@/components/AppHeader";
 
 const AI_TOOLS = ["Copilot", "Cursor", "Lovable", "Bolt", "Claude Code"];
 
@@ -32,18 +33,7 @@ export default async function OnboardingPage() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="border-b border-zinc-800 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Shield className="h-5 w-5 text-red-500" />
-          <span className="font-bold tracking-tight">VibeScan</span>
-        </div>
-        <div className="flex items-center gap-3 text-sm text-zinc-400">
-          <span>{session.user.email}</span>
-          <Link href="/api/auth/signout" className="hover:text-zinc-200 transition-colors">
-            Sign out
-          </Link>
-        </div>
-      </header>
+      <AppHeader email={session.user.email} />
 
       <main className="flex-1 px-6 py-16 max-w-4xl mx-auto w-full">
 

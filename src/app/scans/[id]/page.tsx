@@ -4,6 +4,7 @@ import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
 import { Shield, ArrowLeft, FileCode, Download } from "lucide-react";
 import ScanResultsClient from "./ScanResultsClient";
+import AppHeader from "@/components/AppHeader";
 
 export default async function ScanResultsPage({
   params,
@@ -77,18 +78,7 @@ export default async function ScanResultsPage({
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="border-b border-zinc-800 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Shield className="h-5 w-5 text-red-500" />
-          <span className="font-bold tracking-tight">VibeScan</span>
-        </div>
-        <div className="flex items-center gap-3 text-sm text-zinc-400">
-          <span>{session.user.email}</span>
-          <Link href="/api/auth/signout" className="hover:text-zinc-200 transition-colors">
-            Sign out
-          </Link>
-        </div>
-      </header>
+      <AppHeader email={session.user.email} isAdmin={isAdmin} nav="scans" />
 
       <main className="flex-1 px-6 py-8 max-w-6xl mx-auto w-full">
         <Link
