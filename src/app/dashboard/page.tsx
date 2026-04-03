@@ -128,7 +128,7 @@ export default async function DashboardPage() {
             { label: "Total findings", value: totalFindings },
             { label: "Critical (open)", value: criticalUnresolved, danger: criticalUnresolved > 0 },
           ].map(({ label, value, danger }) => (
-            <div key={label} className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+            <div key={label} className="rounded-lg border border-border bg-card p-4">
               <p className="text-zinc-500 text-xs mb-1">{label}</p>
               <p className={`text-2xl font-bold ${danger ? "text-red-400" : ""}`}>{value}</p>
             </div>
@@ -153,35 +153,35 @@ export default async function DashboardPage() {
         ) : (
           <div>
             <div className="flex items-center justify-between mb-3">
-              <p className="text-sm font-medium text-zinc-400">Recent scans</p>
+              <p className="text-sm font-medium text-foreground">Recent scans</p>
               <Link
                 href="/scans"
-                className="flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-200 transition-colors"
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
               >
                 View all <ArrowRight className="h-3 w-3" />
               </Link>
             </div>
-            <div className="rounded-xl border border-zinc-800 overflow-hidden">
+            <div className="rounded-xl border border-border overflow-hidden">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-zinc-800 bg-zinc-900/50">
-                    <th className="text-left px-4 py-3 text-zinc-400 font-medium">Project</th>
-                    <th className="text-left px-4 py-3 text-zinc-400 font-medium">Source</th>
-                    <th className="text-left px-4 py-3 text-zinc-400 font-medium">Grade</th>
-                    <th className="text-left px-4 py-3 text-zinc-400 font-medium">Findings</th>
-                    <th className="text-left px-4 py-3 text-zinc-400 font-medium">Status</th>
-                    <th className="text-left px-4 py-3 text-zinc-400 font-medium">Date</th>
+                  <tr className="border-b border-border bg-muted/40">
+                    <th className="text-left px-4 py-3 text-muted-foreground font-medium">Project</th>
+                    <th className="text-left px-4 py-3 text-muted-foreground font-medium">Source</th>
+                    <th className="text-left px-4 py-3 text-muted-foreground font-medium">Grade</th>
+                    <th className="text-left px-4 py-3 text-muted-foreground font-medium">Findings</th>
+                    <th className="text-left px-4 py-3 text-muted-foreground font-medium">Status</th>
+                    <th className="text-left px-4 py-3 text-muted-foreground font-medium">Date</th>
                   </tr>
                 </thead>
                 <tbody>
                   {scans.map((scan: typeof scans[0]) => (
-                    <tr key={scan.id} className="border-b border-zinc-800/50 hover:bg-zinc-900/30 transition-colors">
+                    <tr key={scan.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
                       <td className="px-4 py-3">
                         <Link href={`/scans/${scan.id}`} className="font-medium hover:text-red-400 transition-colors">
                           {scan.name}
                         </Link>
                       </td>
-                      <td className="px-4 py-3 text-zinc-400 capitalize">{scan.sourceType.toLowerCase()}</td>
+                      <td className="px-4 py-3 text-muted-foreground capitalize">{scan.sourceType.toLowerCase()}</td>
                       <td className="px-4 py-3">
                         <GradeBadge grade={scan.summary?.grade} />
                       </td>
@@ -217,7 +217,7 @@ export default async function DashboardPage() {
                           <span className="text-zinc-500 text-xs">Pending</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-zinc-500 text-xs">
+                      <td className="px-4 py-3 text-muted-foreground text-xs">
                         {new Date(scan.createdAt).toLocaleDateString()}
                       </td>
                     </tr>

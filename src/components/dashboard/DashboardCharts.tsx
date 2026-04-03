@@ -33,20 +33,20 @@ const GRADE_COLORS: Record<string, string> = {
 };
 
 const CATEGORY_COLORS = [
-  "#f87171", // red
-  "#fb923c", // orange
-  "#facc15", // yellow
-  "#60a5fa", // blue
-  "#a78bfa", // purple
-  "#34d399", // green
-  "#f472b6", // pink
-  "#94a3b8", // slate
+  "#f87171",
+  "#fb923c",
+  "#facc15",
+  "#60a5fa",
+  "#a78bfa",
+  "#34d399",
+  "#f472b6",
+  "#94a3b8",
 ];
 
 function GradeDot({ cx, cy, payload }: { cx?: number; cy?: number; payload?: TrendPoint }) {
   if (!payload || cx === undefined || cy === undefined) return null;
   const color = GRADE_COLORS[payload.grade] ?? "#71717a";
-  return <circle cx={cx} cy={cy} r={5} fill={color} stroke="#18181b" strokeWidth={2} />;
+  return <circle cx={cx} cy={cy} r={5} fill={color} stroke="var(--background)" strokeWidth={2} />;
 }
 
 function ScoreTooltip({
@@ -60,10 +60,10 @@ function ScoreTooltip({
   const d = payload[0].payload;
   const color = GRADE_COLORS[d.grade] ?? "#71717a";
   return (
-    <div className="bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs shadow-lg">
-      <p className="text-zinc-300 font-medium truncate max-w-[140px]">{d.label}</p>
-      <p className="mt-0.5">
-        Score: <span className="font-bold text-zinc-100">{Math.round(d.score)}</span>{" "}
+    <div className="bg-card border border-border rounded-lg px-3 py-2 text-xs shadow-lg">
+      <p className="text-foreground font-medium truncate max-w-[140px]">{d.label}</p>
+      <p className="mt-0.5 text-muted-foreground">
+        Score: <span className="font-bold text-foreground">{Math.round(d.score)}</span>{" "}
         <span className="font-bold" style={{ color }}>
           {d.grade}
         </span>
@@ -81,9 +81,9 @@ function CategoryTooltip({
 }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs shadow-lg">
-      <p className="text-zinc-300 font-medium capitalize">{payload[0].name}</p>
-      <p className="text-zinc-100 font-bold">{payload[0].value} findings</p>
+    <div className="bg-card border border-border rounded-lg px-3 py-2 text-xs shadow-lg">
+      <p className="text-muted-foreground font-medium capitalize">{payload[0].name}</p>
+      <p className="text-foreground font-bold">{payload[0].value} findings</p>
     </div>
   );
 }
@@ -102,22 +102,21 @@ export default function DashboardCharts({
 
   return (
     <div className="grid md:grid-cols-2 gap-6 mb-8">
-      {/* Risk score trend */}
-      <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-5">
-        <p className="text-sm font-medium text-zinc-300 mb-4">Risk score trend</p>
+      <div className="rounded-xl border border-border bg-card p-5">
+        <p className="text-sm font-medium text-foreground mb-4">Risk score trend</p>
         {hasTrend ? (
           <ResponsiveContainer width="100%" height={180}>
             <LineChart data={trendData} margin={{ top: 4, right: 8, bottom: 0, left: -20 }}>
               <XAxis
                 dataKey="label"
-                tick={{ fill: "#71717a", fontSize: 10 }}
+                tick={{ fill: "var(--muted-foreground)", fontSize: 10 }}
                 tickLine={false}
                 axisLine={false}
                 interval="preserveStartEnd"
               />
               <YAxis
                 domain={[0, 100]}
-                tick={{ fill: "#71717a", fontSize: 10 }}
+                tick={{ fill: "var(--muted-foreground)", fontSize: 10 }}
                 tickLine={false}
                 axisLine={false}
                 tickCount={5}
@@ -134,15 +133,14 @@ export default function DashboardCharts({
             </LineChart>
           </ResponsiveContainer>
         ) : (
-          <div className="flex items-center justify-center h-44 text-zinc-600 text-sm">
+          <div className="flex items-center justify-center h-44 text-muted-foreground text-sm">
             Run at least 2 scans to see the trend
           </div>
         )}
       </div>
 
-      {/* Top vulnerability categories */}
-      <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-5">
-        <p className="text-sm font-medium text-zinc-300 mb-4">Top vulnerability categories</p>
+      <div className="rounded-xl border border-border bg-card p-5">
+        <p className="text-sm font-medium text-foreground mb-4">Top vulnerability categories</p>
         {hasCategories ? (
           <ResponsiveContainer width="100%" height={180}>
             <PieChart>
@@ -165,13 +163,13 @@ export default function DashboardCharts({
                 iconType="circle"
                 iconSize={8}
                 formatter={(value: string) => (
-                  <span className="text-zinc-400 text-xs capitalize">{value}</span>
+                  <span className="text-muted-foreground text-xs capitalize">{value}</span>
                 )}
               />
             </PieChart>
           </ResponsiveContainer>
         ) : (
-          <div className="flex items-center justify-center h-44 text-zinc-600 text-sm">
+          <div className="flex items-center justify-center h-44 text-muted-foreground text-sm">
             No findings yet
           </div>
         )}

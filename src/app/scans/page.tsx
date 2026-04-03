@@ -78,7 +78,7 @@ export default async function ScansPage({ searchParams }: { searchParams: Search
           <div>
             <Link
               href="/dashboard"
-              className="inline-flex items-center gap-1.5 text-zinc-400 hover:text-zinc-200 text-sm mb-2 transition-colors"
+              className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground text-sm mb-2 transition-colors"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
               Dashboard
@@ -107,29 +107,29 @@ export default async function ScansPage({ searchParams }: { searchParams: Search
             <p className="font-medium text-zinc-400">No scans match these filters</p>
           </div>
         ) : (
-          <div className="rounded-xl border border-zinc-800 overflow-hidden">
+          <div className="rounded-xl border border-border overflow-hidden">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-zinc-800 bg-zinc-900/50">
-                  <th className="text-left px-4 py-3 text-zinc-400 font-medium">Project</th>
-                  <th className="text-left px-4 py-3 text-zinc-400 font-medium">Source</th>
-                  <th className="text-left px-4 py-3 text-zinc-400 font-medium">Grade</th>
-                  <th className="text-left px-4 py-3 text-zinc-400 font-medium">Risk score</th>
-                  <th className="text-left px-4 py-3 text-zinc-400 font-medium">Findings</th>
-                  <th className="text-left px-4 py-3 text-zinc-400 font-medium">Status</th>
-                  <th className="text-left px-4 py-3 text-zinc-400 font-medium">Date</th>
+                <tr className="border-b border-border bg-muted/40">
+                  <th className="text-left px-4 py-3 text-muted-foreground font-medium">Project</th>
+                  <th className="text-left px-4 py-3 text-muted-foreground font-medium">Source</th>
+                  <th className="text-left px-4 py-3 text-muted-foreground font-medium">Grade</th>
+                  <th className="text-left px-4 py-3 text-muted-foreground font-medium">Risk score</th>
+                  <th className="text-left px-4 py-3 text-muted-foreground font-medium">Findings</th>
+                  <th className="text-left px-4 py-3 text-muted-foreground font-medium">Status</th>
+                  <th className="text-left px-4 py-3 text-muted-foreground font-medium">Date</th>
                   <th className="px-4 py-3" />
                 </tr>
               </thead>
               <tbody>
                 {scans.map((scan) => (
-                  <tr key={scan.id} className="border-b border-zinc-800/50 hover:bg-zinc-900/30 transition-colors">
+                  <tr key={scan.id} className="border-b border-border/50 hover:bg-muted/20 transition-colors">
                     <td className="px-4 py-3">
                       <Link href={`/scans/${scan.id}`} className="font-medium hover:text-red-400 transition-colors">
                         {scan.name}
                       </Link>
                     </td>
-                    <td className="px-4 py-3 text-zinc-400 capitalize text-xs">
+                    <td className="px-4 py-3 text-muted-foreground capitalize text-xs">
                       {scan.sourceType.toLowerCase()}
                     </td>
                     <td className="px-4 py-3">
@@ -171,7 +171,7 @@ export default async function ScansPage({ searchParams }: { searchParams: Search
                         <span className="text-zinc-500 text-xs">Pending</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-zinc-500 text-xs">
+                    <td className="px-4 py-3 text-muted-foreground text-xs">
                       {new Date(scan.createdAt).toLocaleDateString()}
                     </td>
                     <td className="px-4 py-3 text-right">

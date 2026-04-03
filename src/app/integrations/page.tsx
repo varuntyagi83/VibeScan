@@ -17,14 +17,16 @@ export default async function IntegrationsPage() {
 
   const appUrl = process.env.NEXTAUTH_URL ?? "https://vibescan.app";
 
+  const isAdmin = (session.user as { role?: string }).role === "ADMIN";
+
   return (
     <div className="min-h-screen flex flex-col">
-      <AppHeader email={session.user.email} nav="integrations" />
+      <AppHeader email={session.user.email} isAdmin={isAdmin} nav="integrations" />
 
       <main className="flex-1 px-6 py-8 max-w-3xl mx-auto w-full">
         <Link
           href="/dashboard"
-          className="inline-flex items-center gap-1.5 text-zinc-400 hover:text-zinc-200 text-sm mb-6 transition-colors"
+          className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground text-sm mb-6 transition-colors"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           Dashboard
@@ -34,7 +36,7 @@ export default async function IntegrationsPage() {
           <GitBranch className="h-5 w-5 text-red-500" />
           <h1 className="text-2xl font-bold">PR Integrations</h1>
         </div>
-        <p className="text-zinc-400 text-sm mb-8">
+        <p className="text-muted-foreground text-sm mb-8">
           Connect GitHub repositories to automatically scan pull requests. VibeScan will post a
           review comment and block the merge if CRITICAL or HIGH vulnerabilities are introduced.
         </p>

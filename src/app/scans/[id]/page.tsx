@@ -83,7 +83,7 @@ export default async function ScanResultsPage({
       <main className="flex-1 px-6 py-8 max-w-6xl mx-auto w-full">
         <Link
           href="/dashboard"
-          className="inline-flex items-center gap-1.5 text-zinc-400 hover:text-zinc-200 text-sm mb-6 transition-colors"
+          className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground text-sm mb-6 transition-colors"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           Dashboard
@@ -96,7 +96,7 @@ export default async function ScanResultsPage({
           </div>
           <div className="flex-1">
             <h1 className="text-2xl font-bold">{scan.name}</h1>
-            <p className="text-zinc-400 text-sm mt-0.5">
+            <p className="text-muted-foreground text-sm mt-0.5">
               Risk score {Math.round(riskScore)}/100 ·{" "}
               {scan.fileCount} file{scan.fileCount !== 1 ? "s" : ""} ·{" "}
               {scan.linesScanned.toLocaleString()} lines ·{" "}
@@ -110,7 +110,7 @@ export default async function ScanResultsPage({
             <a
               href={`/api/scan/${id}/report`}
               download
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-sm font-medium transition-colors"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-muted hover:bg-muted/80 text-foreground text-sm font-medium border border-border transition-colors"
             >
               <Download className="h-3.5 w-3.5" />
               PDF
@@ -145,7 +145,7 @@ export default async function ScanResultsPage({
             {/* File tree sidebar */}
             {fileTree.length > 1 && (
               <aside className="w-64 shrink-0">
-                <p className="text-zinc-500 text-xs uppercase tracking-wider font-medium mb-2">
+                <p className="text-muted-foreground text-xs uppercase tracking-wider font-medium mb-2">
                   Files with findings
                 </p>
                 <div className="space-y-1">
@@ -153,7 +153,7 @@ export default async function ScanResultsPage({
                     <a
                       key={path}
                       href={`#file-${encodeURIComponent(path)}`}
-                      className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-zinc-800 transition-colors group"
+                      className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted transition-colors group"
                     >
                       <FileCode className="h-3.5 w-3.5 text-zinc-500 shrink-0" />
                       <span className="text-zinc-300 text-xs truncate flex-1 group-hover:text-zinc-100" title={path}>

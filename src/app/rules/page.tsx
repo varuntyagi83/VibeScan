@@ -61,14 +61,16 @@ export default async function RulesPage({ searchParams }: { searchParams: Search
   });
   const sevCounts = Object.fromEntries(stats.map((s) => [s.severity, s._count.id]));
 
+  const isAdmin = (session.user as { role?: string }).role === "ADMIN";
+
   return (
     <div className="min-h-screen flex flex-col">
-      <AppHeader email={session.user.email} nav="rules" />
+      <AppHeader email={session.user.email} isAdmin={isAdmin} nav="rules" />
 
       <main className="flex-1 px-6 py-8 max-w-5xl mx-auto w-full">
         <Link
           href="/dashboard"
-          className="inline-flex items-center gap-1.5 text-zinc-400 hover:text-zinc-200 text-sm mb-6 transition-colors"
+          className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground text-sm mb-6 transition-colors"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           Dashboard
@@ -81,7 +83,7 @@ export default async function RulesPage({ searchParams }: { searchParams: Search
             <h1 className="text-2xl font-bold">Detection Rules</h1>
           </div>
         </div>
-        <p className="text-zinc-400 text-sm mb-6">
+        <p className="text-muted-foreground text-sm mb-6">
           {totalCount} rules detecting vulnerabilities introduced by AI coding tools
         </p>
 
@@ -101,7 +103,7 @@ export default async function RulesPage({ searchParams }: { searchParams: Search
 
         {/* Results count */}
         {(severity || category || tool) && (
-          <p className="text-sm text-zinc-500 mb-4">
+          <p className="text-sm text-muted-foreground mb-4">
             {rules.length} rule{rules.length !== 1 ? "s" : ""} match
             {rules.length !== 1 ? "" : "es"} your filters
           </p>
@@ -116,40 +118,40 @@ export default async function RulesPage({ searchParams }: { searchParams: Search
         ) : (
           <div className="space-y-3">
             {rules.map((rule) => (
-              <div key={rule.id} className="border border-zinc-800 rounded-xl overflow-hidden">
+              <div key={rule.id} className="border border-border rounded-xl overflow-hidden bg-card">
                 {/* Rule header */}
-                <div className="flex items-center gap-3 px-4 py-3 bg-zinc-900/40">
+                <div className="flex items-center gap-3 px-4 py-3 bg-muted/40 border-b border-border">
                   <span
                     className={`inline-flex items-center px-2 py-0.5 rounded border text-xs font-bold ${SEV_COLORS[rule.severity] ?? ""}`}
                   >
                     {rule.severity}
                   </span>
                   <span className="font-semibold text-sm flex-1">{rule.title}</span>
-                  <span className="text-xs text-zinc-500 bg-zinc-800 px-2 py-0.5 rounded">
+                  <span className="text-xs text-muted-foreground bg-muted border border-border px-2 py-0.5 rounded">
                     {CATEGORY_LABELS[rule.category] ?? rule.category}
                   </span>
                 </div>
 
                 {/* Rule body */}
                 <div className="px-4 py-3 space-y-3">
-                  <p className="text-sm text-zinc-300 leading-relaxed">{rule.description}</p>
+                  <p className="text-sm text-foreground leading-relaxed">{rule.description}</p>
 
                   {/* Fix template */}
                   {rule.fixTemplate && (
-                    <div className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2">
-                      <p className="text-xs text-zinc-500 mb-1 font-medium uppercase tracking-wide">Fix</p>
-                      <p className="text-xs text-green-300 font-mono leading-relaxed">{rule.fixTemplate}</p>
+                    <div className="bg-muted border border-border rounded-lg px-3 py-2">
+                      <p className="text-xs text-muted-foreground mb-1 font-medium uppercase tracking-wide">Fix</p>
+                      <p className="text-xs text-green-700 dark:text-green-300 font-mono leading-relaxed">{rule.fixTemplate}</p>
                     </div>
                   )}
 
                   {/* AI tools */}
                   {rule.aiTools.length > 0 && (
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-xs text-zinc-600">Produced by:</span>
+                      <span className="text-xs text-muted-foreground">Produced by:</span>
                       {rule.aiTools.map((t) => (
                         <span
                           key={t}
-                          className="text-xs text-zinc-400 bg-zinc-800 border border-zinc-700 px-2 py-0.5 rounded"
+                          className="text-xs text-foreground bg-muted border border-border px-2 py-0.5 rounded"
                         >
                           {AI_TOOL_LABELS[t] ?? t}
                         </span>

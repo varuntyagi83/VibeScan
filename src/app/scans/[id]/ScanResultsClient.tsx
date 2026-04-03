@@ -149,7 +149,7 @@ function FindingCard({
               <p className="text-green-400 text-xs font-semibold uppercase tracking-wider mb-2">
                 {finding.aiExplanation ? "AI-generated fix" : "Fix suggestion"}
               </p>
-              <pre className="text-green-300 text-xs font-mono whitespace-pre-wrap">
+              <pre className="text-green-700 dark:text-green-300 text-xs font-mono whitespace-pre-wrap">
                 {finding.fixSuggestion}
               </pre>
             </div>
