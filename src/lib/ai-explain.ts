@@ -40,7 +40,7 @@ ${finding.codeSnippet ?? "(no snippet available)"}
 Background: ${finding.description}`;
 
     const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-4.1",
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: userMessage },
