@@ -224,8 +224,15 @@ export default function ScanResultsClient({
     setAnalysisStatus(null);
     startAnalysis(async () => {
       const res = await fetch(`/api/scan/${scanId}/ai-explain`, { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) { setAnalysisStatus(data.error ?? "Analysis failed"); return; }
+      let data: Record<string, unknown> = {};
+      try {
+        const text = await res.text();
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        setAnalysisStatus(`Analysis failed: server returned an unexpected response (${res.status})`);
+        return;
+      }
+      if (!res.ok) { setAnalysisStatus((data.error as string) ?? "Analysis failed"); return; }
 
       const updated = await fetch(`/api/scan/${scanId}/findings`);
       if (updated.ok) {
