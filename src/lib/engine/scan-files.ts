@@ -47,6 +47,22 @@ export function isScannablePath(filePath: string): Language | null {
   return SCANNABLE_EXTENSIONS[ext] ?? null;
 }
 
+/**
+ * Detect whether the project has a Next.js middleware file that handles auth
+ * for API routes. If so, per-route auth checks are redundant.
+ */
+function detectMiddlewareAuth(files: FileEntry[]): boolean {
+  const middlewareFile = files.find((f) =>
+    /(?:^|\/)middleware\.[jt]sx?$/.test(f.path)
+  );
+  if (!middlewareFile) return false;
+
+  // Look for any common auth middleware patterns
+  return /getServerSession|auth\s*\(\s*\)|withAuth|clerkMiddleware|authMiddleware|NextAuth|createMiddleware|currentUser|validateSession/i.test(
+    middlewareFile.content
+  );
+}
+
 export async function scanFiles(
   files: FileEntry[]
 ): Promise<{
@@ -55,6 +71,10 @@ export async function scanFiles(
   fileCount: number;
 }> {
   const limited = files.slice(0, MAX_FILES);
+
+  // Project-level context: does this codebase protect routes via middleware?
+  const hasMiddlewareAuth = detectMiddlewareAuth(limited);
+
   const allFindings: Finding[] = [];
   let linesScanned = 0;
 
@@ -63,6 +83,21 @@ export async function scanFiles(
     const result = await scanCode(content, file.language, file.path);
     allFindings.push(...result.findings);
     linesScanned += result.linesScanned;
+  }
+
+  // If the project has middleware-level auth, downgrade missing-auth-api from
+  // CRITICAL to LOW and add context — routes may be protected by middleware.
+  // We keep the finding (middleware coverage isn't guaranteed per-route) but
+  // it's no longer critical.
+  if (hasMiddlewareAuth) {
+    for (const f of allFindings) {
+      if (f.ruleId === "missing-auth-api") {
+        f.severity = "LOW" as never;
+        f.description =
+          "Auth middleware detected in this project — this route may already be protected. " +
+          "Verify that your middleware matcher covers this path. If it does not, add an inline auth check.";
+      }
+    }
   }
 
   return { allFindings, linesScanned, fileCount: limited.length };
