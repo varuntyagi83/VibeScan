@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { useState, useTransition } from "react";
+import { ChevronDown, ChevronUp, Sparkles, Loader2, Lock } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface Finding {
   id: string;
@@ -14,16 +15,17 @@ interface Finding {
   title: string;
   description: string;
   fixSuggestion: string | null;
+  aiExplanation: string | null;
   falsePositive: boolean;
   fixed: boolean;
 }
 
 const SEVERITY_CONFIG: Record<string, { color: string; bg: string; border: string }> = {
   CRITICAL: { color: "text-red-400", bg: "bg-red-950", border: "border-red-800" },
-  HIGH: { color: "text-orange-400", bg: "bg-orange-950", border: "border-orange-800" },
-  MEDIUM: { color: "text-yellow-400", bg: "bg-yellow-950", border: "border-yellow-800" },
-  LOW: { color: "text-blue-400", bg: "bg-blue-950", border: "border-blue-800" },
-  INFO: { color: "text-zinc-400", bg: "bg-zinc-800", border: "border-zinc-700" },
+  HIGH:     { color: "text-orange-400", bg: "bg-orange-950", border: "border-orange-800" },
+  MEDIUM:   { color: "text-yellow-400", bg: "bg-yellow-950", border: "border-yellow-800" },
+  LOW:      { color: "text-blue-400", bg: "bg-blue-950", border: "border-blue-800" },
+  INFO:     { color: "text-zinc-400", bg: "bg-zinc-800", border: "border-zinc-700" },
 };
 
 const SEV_ORDER = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFO"];
@@ -51,9 +53,13 @@ function FindingCard({ finding }: { finding: Finding }) {
         <div className="flex-1 min-w-0">
           <p className="font-medium text-sm">{finding.title}</p>
           <p className="text-zinc-500 text-xs mt-0.5">
-            {finding.filePath.split("/").pop()} · Line {finding.lineNumber ?? "?"} · {finding.category}
+            {finding.filePath === "paste" ? "paste" : finding.filePath.split("/").pop()} ·{" "}
+            Line {finding.lineNumber ?? "?"} · {finding.category}
           </p>
         </div>
+        {finding.aiExplanation && (
+          <Sparkles className="h-3.5 w-3.5 text-purple-400 shrink-0 mt-0.5" aria-label="AI-analysed" />
+        )}
         {expanded ? (
           <ChevronUp className="h-4 w-4 text-zinc-500 shrink-0 mt-0.5" />
         ) : (
@@ -73,12 +79,30 @@ function FindingCard({ finding }: { finding: Finding }) {
             </pre>
           )}
 
-          <p className="text-zinc-300 text-sm">{finding.description}</p>
+          {/* AI explanation (rich) or fallback description */}
+          {finding.aiExplanation ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-1.5 text-purple-400 text-xs font-semibold uppercase tracking-wider">
+                <Sparkles className="h-3 w-3" />
+                AI Analysis
+              </div>
+              <div className="text-zinc-300 text-sm whitespace-pre-line">
+                {finding.aiExplanation}
+              </div>
+            </div>
+          ) : (
+            <p className="text-zinc-300 text-sm">{finding.description}</p>
+          )}
 
+          {/* Fix suggestion */}
           {finding.fixSuggestion && (
             <div className="bg-green-950/30 border border-green-900 rounded p-3">
-              <p className="text-green-400 text-xs font-semibold uppercase tracking-wider mb-1">Fix</p>
-              <p className="text-green-300 text-sm">{finding.fixSuggestion}</p>
+              <p className="text-green-400 text-xs font-semibold uppercase tracking-wider mb-2">
+                {finding.aiExplanation ? "AI-generated fix" : "Fix suggestion"}
+              </p>
+              <pre className="text-green-300 text-xs font-mono whitespace-pre-wrap">
+                {finding.fixSuggestion}
+              </pre>
             </div>
           )}
         </div>
@@ -87,20 +111,105 @@ function FindingCard({ finding }: { finding: Finding }) {
   );
 }
 
-export default function ScanResultsClient({ findings }: { findings: Finding[] }) {
-  const [activeFile, setActiveFile] = useState<string | null>(null);
+export default function ScanResultsClient({
+  findings: initialFindings,
+  scanId,
+  hasUnexplained,
+}: {
+  findings: Finding[];
+  scanId: string;
+  hasUnexplained: boolean;
+}) {
+  const [findings, setFindings] = useState(initialFindings);
+  const [analysing, startAnalysis] = useTransition();
+  const [analysisStatus, setAnalysisStatus] = useState<string | null>(null);
 
-  const filtered = activeFile
-    ? findings.filter((f) => f.filePath === activeFile)
-    : findings;
+  async function handleAIAnalysis() {
+    setAnalysisStatus(null);
+    startAnalysis(async () => {
+      const res = await fetch(`/api/scan/${scanId}/ai-explain`, { method: "POST" });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setAnalysisStatus(data.error ?? "Analysis failed");
+        return;
+      }
+
+      // Reload findings with new AI data
+      const updated = await fetch(`/api/scan/${scanId}/findings`);
+      if (updated.ok) {
+        const { findings: fresh } = await updated.json();
+        setFindings(fresh);
+      }
+
+      setAnalysisStatus(
+        data.limited
+          ? `Analysed 3 findings (free tier limit). Upgrade to Pro to analyse all.`
+          : `Analysed ${data.enriched} finding${data.enriched !== 1 ? "s" : ""} with AI.`
+      );
+    });
+  }
 
   const grouped = SEV_ORDER.map((sev) => ({
     sev,
-    items: filtered.filter((f) => f.severity === sev),
+    items: findings.filter((f) => f.severity === sev),
   })).filter(({ items }) => items.length > 0);
+
+  const criticalOrHigh = findings.filter(
+    (f) => f.severity === "CRITICAL" || f.severity === "HIGH"
+  );
 
   return (
     <div className="space-y-6">
+      {/* AI analysis banner */}
+      {criticalOrHigh.length > 0 && (
+        <div className="flex items-center justify-between gap-4 p-4 rounded-xl border border-purple-900 bg-purple-950/20">
+          <div>
+            <p className="text-sm font-medium text-purple-300">
+              AI-powered deep analysis
+            </p>
+            <p className="text-xs text-purple-500 mt-0.5">
+              {hasUnexplained
+                ? `Get plain-English explanations, attack vectors, and AI-generated fixes for your ${criticalOrHigh.length} critical/high findings`
+                : "All critical/high findings have been analysed"}
+            </p>
+          </div>
+          {hasUnexplained ? (
+            <Button
+              onClick={handleAIAnalysis}
+              disabled={analysing}
+              className="bg-purple-700 hover:bg-purple-600 shrink-0 text-sm"
+            >
+              {analysing ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                  Analysing…
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                  Analyse with AI
+                </>
+              )}
+            </Button>
+          ) : (
+            <span className="flex items-center gap-1.5 text-purple-400 text-xs">
+              <Sparkles className="h-3.5 w-3.5" />
+              Complete
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Status message */}
+      {analysisStatus && (
+        <p className="text-sm text-zinc-400 flex items-center gap-1.5">
+          {analysisStatus.includes("limit") && <Lock className="h-3.5 w-3.5 text-yellow-400" />}
+          {analysisStatus}
+        </p>
+      )}
+
+      {/* Findings grouped by severity */}
       {grouped.map(({ sev, items }) => (
         <div key={sev}>
           <div className="flex items-center gap-2 mb-3">

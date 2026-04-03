@@ -20,10 +20,7 @@ export default async function ScanResultsPage({
     include: {
       summary: true,
       findings: {
-        orderBy: [
-          { severity: "asc" }, // CRITICAL first (alphabetically C < H < I < L < M)
-          { lineNumber: "asc" },
-        ],
+        orderBy: [{ lineNumber: "asc" }],
       },
     },
   });
@@ -177,7 +174,15 @@ export default async function ScanResultsPage({
 
             {/* Findings */}
             <div className="flex-1 min-w-0">
-              <ScanResultsClient findings={sortedFindings} />
+              <ScanResultsClient
+                findings={sortedFindings}
+                scanId={scan.id}
+                hasUnexplained={sortedFindings.some(
+                  (f) =>
+                    (f.severity === "CRITICAL" || f.severity === "HIGH") &&
+                    !f.aiExplanation
+                )}
+              />
             </div>
           </div>
         )}
