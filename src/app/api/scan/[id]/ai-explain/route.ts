@@ -36,7 +36,11 @@ export async function POST(
   const isPro = (session.user as { role?: string }).role === "ADMIN"; // placeholder — wire to subscription tier
   const limit = isPro ? Infinity : FREE_LIMIT;
 
-  const enriched = await enrichFindingsWithAI(scanId, limit);
-
-  return NextResponse.json({ enriched, limited: !isPro && enriched >= FREE_LIMIT });
+  try {
+    const enriched = await enrichFindingsWithAI(scanId, limit);
+    return NextResponse.json({ enriched, limited: !isPro && enriched >= FREE_LIMIT });
+  } catch (err) {
+    console.error("[ai-explain]", err);
+    return NextResponse.json({ error: "AI analysis failed" }, { status: 500 });
+  }
 }

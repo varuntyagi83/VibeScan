@@ -64,16 +64,18 @@ export async function enrichFindingsWithAI(
   limit: number = Infinity
 ): Promise<number> {
   // Only analyse CRITICAL and HIGH findings that haven't been explained yet
-  const findings = await prisma.finding.findMany({
+  const findingsQuery = prisma.finding.findMany({
     where: {
       scanId,
       severity: { in: ["CRITICAL", "HIGH"] },
       aiExplanation: null,
       falsePositive: false,
     },
-    take: limit,
+    ...(isFinite(limit) ? { take: limit } : {}),
     orderBy: { severity: "asc" }, // CRITICAL first
   });
+
+  const findings = await findingsQuery;
 
   if (findings.length === 0) return 0;
 
