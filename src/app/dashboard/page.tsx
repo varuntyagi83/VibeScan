@@ -69,6 +69,8 @@ export default async function DashboardPage() {
     }),
   ]);
 
+  if (scans.length === 0) redirect("/onboarding");
+
   const avgRiskScore =
     scans.length > 0
       ? Math.round(
@@ -103,6 +105,9 @@ export default async function DashboardPage() {
         <div className="flex items-center gap-3 text-sm">
           <Link href="/scans" className="text-zinc-400 hover:text-zinc-200 transition-colors">
             All scans
+          </Link>
+          <Link href="/rules" className="text-zinc-400 hover:text-zinc-200 transition-colors">
+            Rules
           </Link>
           <Link href="/integrations" className="text-zinc-400 hover:text-zinc-200 transition-colors">
             Integrations
