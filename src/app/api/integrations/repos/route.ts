@@ -31,6 +31,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "owner and repo are required" }, { status: 400 });
   }
 
+  // Validate GitHub identifier format to prevent malformed API calls
+  const GITHUB_OWNER_RE = /^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,37}[a-zA-Z0-9])?$/;
+  const GITHUB_REPO_RE = /^[a-zA-Z0-9\-_.]{1,100}$/;
+  if (!GITHUB_OWNER_RE.test(owner) || !GITHUB_REPO_RE.test(repo)) {
+    return NextResponse.json({ error: "Invalid GitHub owner or repository name" }, { status: 400 });
+  }
+
   // Check if already connected (by another user)
   const existing = await prisma.connectedRepo.findUnique({
     where: { owner_repo: { owner, repo } },
@@ -54,6 +61,10 @@ export async function POST(req: Request) {
       failOn: failOn ?? "HIGH",
     },
     update: {
+      // Always rotate the secret on reconnect so the returned value matches
+      // what gets saved — prevents the UI showing a secret that differs from
+      // what's stored in the database.
+      webhookSecret,
       failOn: failOn ?? "HIGH",
     },
   });

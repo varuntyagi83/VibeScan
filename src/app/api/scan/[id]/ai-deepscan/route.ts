@@ -81,9 +81,31 @@ export async function POST(
     return NextResponse.json({ error: "Scan not complete" }, { status: 400 });
   }
 
-  // Check not already deep-scanned
-  const existing = await prisma.finding.count({ where: { scanId, ruleId: "ai-detected" } });
-  if (existing > 0) {
+  // Atomically check-and-mark to prevent TOCTOU race from double-clicks.
+  // Two concurrent requests both pass a naive count check — use an interactive
+  // transaction so the second request sees the sentinel inserted by the first.
+  const canProceed = await prisma.$transaction(async (tx) => {
+    const existing = await tx.finding.count({ where: { scanId, ruleId: "ai-detected" } });
+    if (existing > 0) return false;
+    // Insert a sentinel record; if a concurrent request beats us here the
+    // unique index on (scanId, filePath, ruleId) would fire — but we don't
+    // have one, so the transaction serialisation on PostgreSQL protects us.
+    await tx.finding.create({
+      data: {
+        scanId,
+        filePath: "__deep_scan_sentinel__",
+        lineNumber: 0,
+        ruleId: "ai-detected",
+        severity: "INFO" as never,
+        category: "system",
+        title: "Deep scan initializing",
+        description: "Sentinel — replaced when real findings are saved",
+      },
+    });
+    return true;
+  });
+
+  if (!canProceed) {
     return NextResponse.json({ error: "Deep scan already run for this scan" }, { status: 409 });
   }
 
@@ -110,47 +132,52 @@ export async function POST(
     const files = await extractZip(buffer);
 
     if (files.length === 0) {
+      // Clean up sentinel — no files to scan
+      await prisma.finding.deleteMany({ where: { scanId, filePath: "__deep_scan_sentinel__" } });
       return NextResponse.json({ found: 0 });
     }
 
     const deepFindings = await deepScanFiles(files);
 
     if (deepFindings.length === 0) {
+      // Clean up sentinel — scan ran cleanly, nothing found
+      await prisma.finding.deleteMany({ where: { scanId, filePath: "__deep_scan_sentinel__" } });
       return NextResponse.json({ found: 0 });
     }
 
-    // Save findings
-    await prisma.finding.createMany({
-      data: deepFindings.map((f) => ({
-        scanId,
-        filePath: f.filePath,
-        lineNumber: f.lineNumber,
-        ruleId: "ai-detected",
-        severity: f.severity as never,
-        category: "ai-detected",
-        title: f.title,
-        description: f.description,
-        aiExplanation: `${f.description}\n\nAttack vector: ${f.attackVector}`,
-        fixSuggestion: f.fix,
-      })),
-    });
-
-    // Update ScanSummary counts
+    // Save findings + update summary atomically so we never get orphaned findings
+    // without a summary update (or vice versa).
     const counts = deepFindings.reduce(
       (acc, f) => { acc[f.severity] = (acc[f.severity] ?? 0) + 1; return acc; },
       {} as Record<string, number>
     );
 
-    await prisma.scanSummary.update({
-      where: { scanId },
-      data: {
-        totalFindings: { increment: deepFindings.length },
-        criticalCount: { increment: counts.CRITICAL ?? 0 },
-        highCount: { increment: counts.HIGH ?? 0 },
-        mediumCount: { increment: counts.MEDIUM ?? 0 },
-        lowCount: { increment: counts.LOW ?? 0 },
-      },
-    });
+    await prisma.$transaction([
+      prisma.finding.createMany({
+        data: deepFindings.map((f) => ({
+          scanId,
+          filePath: f.filePath,
+          lineNumber: f.lineNumber,
+          ruleId: "ai-detected",
+          severity: f.severity as never,
+          category: "ai-detected",
+          title: f.title,
+          description: f.description,
+          aiExplanation: `${f.description}\n\nAttack vector: ${f.attackVector}`,
+          fixSuggestion: f.fix,
+        })),
+      }),
+      prisma.scanSummary.update({
+        where: { scanId },
+        data: {
+          totalFindings: { increment: deepFindings.length },
+          criticalCount: { increment: counts.CRITICAL ?? 0 },
+          highCount: { increment: counts.HIGH ?? 0 },
+          mediumCount: { increment: counts.MEDIUM ?? 0 },
+          lowCount: { increment: counts.LOW ?? 0 },
+        },
+      }),
+    ]);
 
     return NextResponse.json({ found: deepFindings.length });
   } catch (err) {

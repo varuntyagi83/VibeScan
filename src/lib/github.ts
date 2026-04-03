@@ -44,7 +44,11 @@ export async function listUserRepos(token: string): Promise<GitHubRepo[]> {
   );
   if (!res.ok) {
     const body = await res.json().catch(() => ({})) as { message?: string };
-    throw new Error(body.message ?? `GitHub API error ${res.status}`);
+    const retryAfter = res.headers.get("Retry-After") ?? res.headers.get("X-RateLimit-Reset");
+    const rateLimitMsg = res.status === 403 || res.status === 429
+      ? ` Rate limited${retryAfter ? ` — retry after ${retryAfter}s` : ""}.`
+      : "";
+    throw new Error((body.message ?? `GitHub API error ${res.status}`) + rateLimitMsg);
   }
   return res.json() as Promise<GitHubRepo[]>;
 }
@@ -64,7 +68,10 @@ export async function getRepoBranches(
       },
     }
   );
-  if (!res.ok) throw new Error(`Failed to fetch branches: ${res.status}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({})) as { message?: string };
+    throw new Error(body.message ?? `Failed to fetch branches: ${res.status}`);
+  }
   return res.json() as Promise<GitHubBranch[]>;
 }
 

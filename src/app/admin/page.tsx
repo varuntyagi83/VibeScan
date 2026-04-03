@@ -19,6 +19,7 @@ export default async function AdminPage() {
   const [users, totalScans, totalFindings, criticalOpen, recentScans] = await Promise.all([
     prisma.user.findMany({
       orderBy: { createdAt: "desc" },
+      take: 500, // safety valve — prevents OOM on large user tables
       select: {
         id: true,
         email: true,

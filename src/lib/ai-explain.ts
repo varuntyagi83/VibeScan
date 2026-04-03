@@ -88,9 +88,12 @@ export async function enrichFindingsWithAI(
   for (let i = 0; i < findings.length; i += BATCH_SIZE) {
     const batch = findings.slice(i, i + BATCH_SIZE);
 
-    const results = await Promise.all(
+    // allSettled so a single OpenAI failure doesn't abort the whole batch —
+    // findings that succeeded are still persisted.
+    const settled = await Promise.allSettled(
       batch.map((f) => analyzeOneFinding(f))
     );
+    const results = settled.map((r) => r.status === "fulfilled" ? r.value : null);
 
     const updates = batch
       .map((f, idx) => ({ finding: f, analysis: results[idx] }))

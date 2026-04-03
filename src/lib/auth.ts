@@ -28,9 +28,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
-        // Fetch role + orgId from DB on first sign-in
+      }
+      // Always re-fetch role + orgId from DB so role changes (promotions/demotions)
+      // take effect immediately without requiring the user to sign out.
+      if (token.id) {
         const dbUser = await prisma.user.findUnique({
-          where: { id: user.id },
+          where: { id: token.id as string },
           select: { role: true, orgId: true },
         });
         token.role = dbUser?.role;

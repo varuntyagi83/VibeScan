@@ -11,8 +11,21 @@ export default function DeleteScanButton({ scanId }: { scanId: string }) {
 
   async function handleDelete() {
     setDeleting(true);
-    await fetch(`/api/scan/${scanId}`, { method: "DELETE" });
-    router.refresh();
+    try {
+      const res = await fetch(`/api/scan/${scanId}`, { method: "DELETE" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({})) as { error?: string };
+        alert(data.error ?? "Failed to delete scan. Please try again.");
+        setDeleting(false);
+        setConfirming(false);
+        return;
+      }
+      router.refresh();
+    } catch {
+      alert("Network error — could not delete scan.");
+      setDeleting(false);
+      setConfirming(false);
+    }
   }
 
   if (confirming) {

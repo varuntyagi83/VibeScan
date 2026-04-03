@@ -42,7 +42,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No file provided" }, { status: 400 });
   }
 
-  const projectName = (formData.get("name") as string | null)?.trim() || file.name.replace(/\.(zip|tar\.gz)$/, "");
+  const rawName = (formData.get("name") as string | null)?.trim() || file.name.replace(/\.(zip|tar\.gz)$/, "");
+  // Sanitize: strip HTML/control characters, enforce length
+  const projectName = rawName.replace(/[<>"'&\x00-\x1f]/g, "").slice(0, 100) || "Uploaded scan";
 
   const scan = await prisma.scan.create({
     data: {
