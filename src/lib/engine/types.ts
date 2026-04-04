@@ -26,6 +26,7 @@ export interface Finding {
   description: string;
   aiTools: string[];
   fixTemplate: string | null;
+  riskCategories: string[];
 }
 
 export interface ScanResult {

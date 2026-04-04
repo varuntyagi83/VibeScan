@@ -2,6 +2,7 @@
 
 import type { FileEntry } from "./scan-files";
 import type { Finding } from "./types";
+import { getRiskCategories } from "./risk-categories";
 
 // ─── Semver helpers ───────────────────────────────────────────────────────────
 
@@ -247,6 +248,7 @@ export function scanDependencies(files: FileEntry[]): Finding[] {
         codeSnippet: `"${pkgName}": "${versionSpec}"`,
         severity: vuln.severity,
         category: "dependency",
+        riskCategories: getRiskCategories(vuln.id),
         title: `Vulnerable dependency: ${pkgName}@${min} — ${vuln.title}`,
         description:
           `${vuln.description} ` +
@@ -255,6 +257,50 @@ export function scanDependencies(files: FileEntry[]): Finding[] {
         aiTools: [],
         fixTemplate:
           `# Update ${pkgName} to a patched version:\nnpm install ${pkgName}@>=${vuln.fixVersion}\n# or: pnpm add ${pkgName}@>=${vuln.fixVersion}`,
+      });
+    }
+  }
+
+  // ── Dependency confusion: internal-looking scoped packages ──────────────────
+  // @internal/, @private/, @local/ prefixed scopes almost certainly refer to
+  // internal company packages. If there's no .npmrc in the scanned files
+  // configuring a private registry, these packages may resolve from the public
+  // npm registry — letting an attacker upload a higher-versioned package and
+  // get it installed automatically.
+  const hasPrivateRegistry = files.some(
+    (f) =>
+      /\.npmrc$/.test(f.path) &&
+      /registry\s*=\s*https?:\/\/(?!registry\.npmjs\.org)/i.test(f.content)
+  );
+
+  if (!hasPrivateRegistry) {
+    const internalScopeRe = /^@(?:internal|private|local|corp|company|org)\//i;
+    const internalDeps = Object.keys(deps).filter((d) =>
+      internalScopeRe.test(d)
+    );
+
+    for (const dep of internalDeps) {
+      findings.push({
+        ruleId: "dep-dependency-confusion",
+        filePath: pkgFile.path,
+        lineNumber: null,
+        lineEnd: null,
+        codeSnippet: `"${dep}": "${deps[dep]}"`,
+        severity: "HIGH",
+        category: "dependency",
+        riskCategories: getRiskCategories("dep-dependency-confusion"),
+        title: `Potential dependency confusion: ${dep} without private registry config`,
+        description:
+          `\`${dep}\` looks like an internal package (scoped to \`${dep.split("/")[0]}\`) ` +
+          `but no \`.npmrc\` file configuring a private registry was found. ` +
+          `If this package is not published on npm, an attacker can register it publicly ` +
+          `with a higher version number and npm will install the malicious version automatically. ` +
+          `This attack has compromised dozens of companies including PayPal and Microsoft.`,
+        aiTools: [],
+        fixTemplate:
+          `# Add a .npmrc file to point @your-scope to your private registry:\n` +
+          `@${dep.split("/")[0].slice(1)}:registry=https://your-private-registry.com\n\n` +
+          `# Or publish the package to npm if it's intended to be public.`,
       });
     }
   }

@@ -84,6 +84,7 @@ export async function POST(req: NextRequest) {
           title: f.title,
           description: f.description,
           fixSuggestion: f.fixTemplate,
+          riskCategories: f.riskCategories ?? [],
         })),
       }),
       prisma.scanSummary.create({

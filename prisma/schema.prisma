@@ -134,6 +134,7 @@ model Finding {
   description   String   @db.Text
   aiExplanation String?  @db.Text
   fixSuggestion String?  @db.Text
+  riskCategories String[] @default([])
   fixed         Boolean  @default(false)
   falsePositive Boolean  @default(false)
   createdAt     DateTime @default(now())

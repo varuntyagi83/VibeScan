@@ -51,6 +51,7 @@ export function runRegexRule(
         description: rule.description,
         aiTools: rule.aiTools,
         fixTemplate: rule.fixTemplate,
+        riskCategories: [],  // enriched by scan-files.ts via getRiskCategories()
       });
     }
   });

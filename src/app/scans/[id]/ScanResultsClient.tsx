@@ -21,6 +21,26 @@ interface Finding {
   aiExplanation: string | null;
   falsePositive: boolean;
   fixed: boolean;
+  riskCategories: string[];
+}
+
+const RISK_CATEGORY_CONFIG: Record<string, { label: string; color: string; bg: string; border: string }> = {
+  financial:    { label: "Financial",    color: "text-amber-400",  bg: "bg-amber-950",  border: "border-amber-800" },
+  reputational: { label: "Reputational", color: "text-purple-400", bg: "bg-purple-950", border: "border-purple-800" },
+  user:         { label: "User Impact",  color: "text-blue-400",   bg: "bg-blue-950",   border: "border-blue-800" },
+  operational:  { label: "Operational",  color: "text-orange-400", bg: "bg-orange-950", border: "border-orange-800" },
+  security:     { label: "Security",     color: "text-red-400",    bg: "bg-red-950",    border: "border-red-800" },
+  compliance:   { label: "Compliance",   color: "text-green-400",  bg: "bg-green-950",  border: "border-green-800" },
+};
+
+function RiskBadge({ category }: { category: string }) {
+  const cfg = RISK_CATEGORY_CONFIG[category];
+  if (!cfg) return null;
+  return (
+    <span className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-medium ${cfg.color} ${cfg.bg} border ${cfg.border}`}>
+      {cfg.label}
+    </span>
+  );
 }
 
 const SEVERITY_CONFIG: Record<string, { color: string; bg: string; border: string }> = {
@@ -91,6 +111,13 @@ function FindingCard({
             })()}
             {" "}· Line {finding.lineNumber ?? "?"} · {finding.category}
           </p>
+          {finding.riskCategories?.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1.5">
+              {finding.riskCategories.map((cat) => (
+                <RiskBadge key={cat} category={cat} />
+              ))}
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
           {isAiDetected && (

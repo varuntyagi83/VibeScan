@@ -1,6 +1,7 @@
 import { scanCode } from "./index";
 import { analyzeProjectGraph } from "./project-graph";
 import { scanDependencies } from "./dep-scanner";
+import { getRiskCategories } from "./risk-categories";
 import type { Finding, Language } from "./types";
 
 const SCANNABLE_EXTENSIONS: Record<string, Language> = {
@@ -120,6 +121,16 @@ export async function scanFiles(
   // Parse package.json and flag packages with known CVEs.
   const depFindings = scanDependencies(limited);
   allFindings.push(...depFindings);
+
+  // ── Risk category enrichment ─────────────────────────────────────────────
+  // Apply risk categories to all findings based on their ruleId.
+  // Graph and dep findings already include riskCategories; AST/regex findings
+  // get an empty array from the runners — fill them here.
+  for (const f of allFindings) {
+    if (!f.riskCategories || f.riskCategories.length === 0) {
+      f.riskCategories = getRiskCategories(f.ruleId);
+    }
+  }
 
   return { allFindings, linesScanned, fileCount: limited.length };
 }

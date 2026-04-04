@@ -165,6 +165,7 @@ export async function POST(
           description: f.description,
           aiExplanation: `${f.description}\n\nAttack vector: ${f.attackVector}`,
           fixSuggestion: f.fix,
+          riskCategories: ["security"],
         })),
       }),
       prisma.scanSummary.update({

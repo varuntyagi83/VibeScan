@@ -14,6 +14,7 @@
 
 import type { FileEntry } from "./scan-files";
 import type { Finding } from "./types";
+import { getRiskCategories } from "./risk-categories";
 
 // ─── Shared patterns ──────────────────────────────────────────────────────────
 
@@ -297,6 +298,7 @@ function detectIDOR(routes: RouteInfo[]): Finding[] {
       codeSnippet: `prisma.${op.model}.${op.method}({ where: { id: params.${paramName} } })`,
       severity: "CRITICAL",
       category: "authorization",
+      riskCategories: getRiskCategories("graph-idor"),
       title: "IDOR: Resource queried by ID without ownership verification",
       description:
         `Route \`${route.routePath}\` uses \`params.${paramName}\` in a Prisma query but never checks that the record belongs to the authenticated user (\`createdById\`, \`userId\`, etc.). ` +
@@ -330,6 +332,7 @@ function detectServerActionAuthBypass(
       codeSnippet: `export async function ${a.functionName}(...)`,
       severity: "CRITICAL",
       category: "authentication",
+      riskCategories: getRiskCategories("graph-server-action-no-auth"),
       title: `Server action '${a.functionName}' writes to database without authentication`,
       description:
         `The server action \`${a.functionName}\` in \`${a.filePath}\` performs a database write but does not call \`auth()\` or any equivalent check. ` +
@@ -383,6 +386,7 @@ function detectMiddlewareCoverageGaps(
       codeSnippet: `export async function ${mutationMethods[0]}(req, { params }) { ... }`,
       severity: "HIGH",
       category: "authentication",
+      riskCategories: getRiskCategories("graph-middleware-gap"),
       title: `Mutation route not protected by middleware or inline auth`,
       description:
         `\`${route.routePath}\` handles ${mutationMethods.join("/")} requests. ` +
@@ -425,6 +429,7 @@ function detectMassAssignment(routes: RouteInfo[]): Finding[] {
       codeSnippet: `await prisma.${op.model}.${op.method}({ data: body })`,
       severity: "HIGH",
       category: "injection",
+      riskCategories: getRiskCategories("graph-mass-assignment"),
       title: "Mass assignment: raw request body passed to Prisma write",
       description:
         `Route \`${route.routePath}\` spreads or directly passes the parsed request body into \`prisma.${op.model}.${op.method}\`. ` +
@@ -500,6 +505,7 @@ function detectSecretsInClientImports(files: FileEntry[]): Finding[] {
           codeSnippet: m[0],
           severity: "HIGH",
           category: "data-exposure",
+          riskCategories: getRiskCategories("graph-secret-in-client-import"),
           title:
             "Client component imports module that contains server-side secrets",
           description:
@@ -554,6 +560,7 @@ function detectMissingCaptcha(files: FileEntry[]): Finding[] {
       codeSnippet: `// No CAPTCHA found across ${authFiles.length} auth page(s)`,
       severity: "MEDIUM",
       category: "authentication",
+      riskCategories: getRiskCategories("graph-missing-captcha"),
       title: "No CAPTCHA protection on authentication forms",
       description:
         `Auth pages detected (${examplePaths}) but no CAPTCHA library ` +
@@ -596,6 +603,7 @@ function detectMissingSecurityHeaders(files: FileEntry[]): Finding[] {
         codeSnippet: `// next.config: no security headers() configured`,
         severity: "MEDIUM",
         category: "configuration",
+        riskCategories: getRiskCategories("graph-missing-security-headers"),
         title: "Security headers not configured in next.config",
         description:
           `\`next.config\` does not define a \`headers()\` function. ` +
@@ -644,6 +652,7 @@ function detectMissingSecurityHeaders(files: FileEntry[]): Finding[] {
       codeSnippet: `// Missing: ${missingHeaders.join(", ")}`,
       severity: "LOW",
       category: "configuration",
+      riskCategories: getRiskCategories("graph-missing-security-headers"),
       title: `Incomplete security headers: missing ${missingHeaders.slice(0, 3).join(", ")}`,
       description:
         `\`next.config\` has a \`headers()\` function but is missing: ${missingHeaders.join(", ")}. ` +
@@ -655,6 +664,214 @@ function detectMissingSecurityHeaders(files: FileEntry[]): Finding[] {
         .join(",\n"),
     },
   ];
+}
+
+// ─── Rule 8: Stripe / payment amount sourced from client ─────────────────────
+
+function detectStripePriceFromClient(files: FileEntry[]): Finding[] {
+  const findings: Finding[] = [];
+
+  for (const file of files) {
+    const code = file.content;
+    if (!/stripe\.(?:checkout\.sessions|paymentIntents)\.(create|update)/i.test(code)) continue;
+
+    // price/amount comes from destructured request body
+    const hasClientPrice =
+      /const\s+\{[^}]*(?:amount|price|priceId|price_id)[^}]*\}\s*=\s*(?:await\s+)?(?:req|request)\.json\(\)/i.test(code) ||
+      /(?:amount|price|priceId|price_id)\s*:\s*(?:body|data|payload)\./i.test(code) ||
+      /(?:amount|priceId|price_id)\s*,\s*\}?\s*=\s*(?:await\s+)?(?:req|request)\.json\(\)/i.test(code);
+
+    if (!hasClientPrice) continue;
+
+    const lines = code.split("\n");
+    const idx = lines.findIndex((l) =>
+      /stripe\.(?:checkout|paymentIntents)/i.test(l)
+    );
+    if (idx < 0) continue;
+
+    findings.push({
+      ruleId: "graph-stripe-price-client",
+      filePath: file.path,
+      lineNumber: idx + 1,
+      lineEnd: idx + 1,
+      codeSnippet: lines[idx]?.trim() ?? "",
+      severity: "CRITICAL",
+      category: "authorization",
+      riskCategories: getRiskCategories("graph-stripe-price-client"),
+      title: "Payment amount or price accepted from client request",
+      description:
+        `This route creates a Stripe checkout session or payment intent using \`amount\`, \`priceId\`, or \`price\` ` +
+        `sourced from the request body. An attacker can change the price to 1 cent in DevTools before submission. ` +
+        `Price/amount must ALWAYS come from a server-side lookup — never from the client. ` +
+        `This is among the most financially damaging bugs in AI-generated SaaS apps.`,
+      aiTools: ["cursor", "copilot", "v0", "bolt", "lovable", "replit"],
+      fixTemplate:
+        `// Server-side price map — never accept priceId or amount from the client:\n` +
+        `const PLAN_PRICES: Record<string, string> = {\n` +
+        `  pro: 'price_abc123',\n` +
+        `  enterprise: 'price_xyz789',\n` +
+        `};\n` +
+        `const { plan } = await req.json(); // only accept the plan name, not the price\n` +
+        `const price = PLAN_PRICES[plan];\n` +
+        `if (!price) return NextResponse.json({ error: 'Invalid plan' }, { status: 400 });`,
+    });
+  }
+
+  return findings;
+}
+
+// ─── Rule 9: Account enumeration via distinct auth error messages ──────────────
+
+function detectAccountEnumeration(files: FileEntry[]): Finding[] {
+  const findings: Finding[] = [];
+  const authPathRe =
+    /\/(login|signin|sign-in|register|signup|sign-up|forgot-password|reset-password)\//i;
+
+  for (const file of files) {
+    if (!authPathRe.test(file.path)) continue;
+    if (!/route\.[jt]sx?$/.test(file.path)) continue;
+
+    const code = file.content;
+    const userNotFound =
+      /['"](?:user|account|email)[\s\w]*(?:not found|does not exist|doesn't exist|no account|not registered)/i.test(
+        code
+      );
+    const wrongPassword =
+      /['"](?:invalid|incorrect|wrong)\s*(?:password|credentials?|passphrase)/i.test(
+        code
+      );
+
+    if (!userNotFound || !wrongPassword) continue;
+
+    const lines = code.split("\n");
+    const idx = lines.findIndex((l) =>
+      /['"](?:user|account|email)[\s\w]*(?:not found|does not exist)/i.test(l)
+    );
+
+    findings.push({
+      ruleId: "graph-account-enumeration",
+      filePath: file.path,
+      lineNumber: (idx >= 0 ? idx : 0) + 1,
+      lineEnd: (idx >= 0 ? idx : 0) + 1,
+      codeSnippet: idx >= 0 ? lines[idx]?.trim() ?? "" : "",
+      severity: "MEDIUM",
+      category: "authentication",
+      riskCategories: getRiskCategories("graph-account-enumeration"),
+      title: "Account enumeration via distinct auth error messages",
+      description:
+        `This auth route returns different error messages depending on whether the account exists ` +
+        `("User not found" vs "Incorrect password"). Attackers use these signals to enumerate valid accounts ` +
+        `before launching credential stuffing attacks. Return a single generic message for all auth failures.`,
+      aiTools: ["cursor", "copilot", "v0", "bolt", "lovable", "replit"],
+      fixTemplate:
+        `// Always return the same message regardless of which check failed:\n` +
+        `return NextResponse.json(\n` +
+        `  { error: 'Invalid email or password' },\n` +
+        `  { status: 401 }\n` +
+        `);`,
+    });
+  }
+
+  return findings;
+}
+
+// ─── Rule 10: Password reset token without expiry ─────────────────────────────
+
+function detectPasswordResetLifecycle(files: FileEntry[]): Finding[] {
+  const findings: Finding[] = [];
+  const tokenFieldRe =
+    /(?:resetToken|passwordResetToken|forgotPasswordToken|reset_token|verificationToken)\s*:/i;
+  const expiryFieldRe =
+    /(?:resetTokenExpiry|tokenExpiresAt|expiresAt|expiredAt|resetExpiry|validUntil|tokenExpiry)\s*:/i;
+
+  for (const file of files) {
+    const code = file.content;
+    if (!tokenFieldRe.test(code)) continue;
+    if (!/prisma\.\w+\.(create|update|upsert)\s*\(/i.test(code)) continue;
+    if (expiryFieldRe.test(code)) continue; // has expiry — fine
+
+    const lines = code.split("\n");
+    const idx = lines.findIndex((l) => tokenFieldRe.test(l));
+    if (idx < 0) continue;
+
+    findings.push({
+      ruleId: "graph-password-reset-lifecycle",
+      filePath: file.path,
+      lineNumber: idx + 1,
+      lineEnd: idx + 1,
+      codeSnippet: lines[idx]?.trim() ?? "",
+      severity: "HIGH",
+      category: "authentication",
+      riskCategories: getRiskCategories("graph-password-reset-lifecycle"),
+      title: "Password reset token stored without expiry",
+      description:
+        `A password reset token is written to the database but no expiry field ` +
+        `(\`resetTokenExpiry\`, \`expiresAt\`, etc.) is set alongside it. ` +
+        `Tokens that never expire become permanent account takeover links — a leaked token ` +
+        `gives an attacker indefinite access even after the user has forgotten about it. ` +
+        `Tokens should expire within 15–60 minutes and be deleted after first use.`,
+      aiTools: ["cursor", "copilot", "v0", "bolt", "lovable", "replit"],
+      fixTemplate:
+        `// Set a short expiry when issuing the token:\nawait prisma.user.update({\n` +
+        `  where: { email },\n` +
+        `  data: {\n` +
+        `    resetToken: crypto.randomBytes(32).toString('hex'),\n` +
+        `    resetTokenExpiry: new Date(Date.now() + 15 * 60 * 1000), // 15 min\n` +
+        `  },\n` +
+        `});\n` +
+        `// On use: verify token AND check expiry, then clear both fields.`,
+    });
+  }
+
+  return findings;
+}
+
+// ─── Rule 11: GraphQL introspection enabled in production ─────────────────────
+
+function detectGraphQLIntrospection(files: FileEntry[]): Finding[] {
+  for (const file of files) {
+    const code = file.content;
+    if (
+      !/graphql-yoga|createYoga|ApolloServer|makeExecutableSchema|pothos|nexus|type-graphql/i.test(
+        code
+      )
+    )
+      continue;
+    if (/introspection\s*:\s*(?:false|process\.env|NODE_ENV)/i.test(code)) continue;
+
+    const lines = code.split("\n");
+    const idx = lines.findIndex((l) =>
+      /graphql-yoga|createYoga|ApolloServer|makeExecutableSchema/i.test(l)
+    );
+
+    return [
+      {
+        ruleId: "graph-graphql-introspection",
+        filePath: file.path,
+        lineNumber: (idx >= 0 ? idx : 0) + 1,
+        lineEnd: (idx >= 0 ? idx : 0) + 1,
+        codeSnippet: idx >= 0 ? lines[idx]?.trim() ?? "" : "",
+        severity: "MEDIUM",
+        category: "configuration",
+        riskCategories: getRiskCategories("graph-graphql-introspection"),
+        title: "GraphQL introspection enabled in production",
+        description:
+          `The GraphQL server does not explicitly disable introspection. In production, introspection ` +
+          `exposes your entire schema — all types, queries, mutations, arguments, and field names — ` +
+          `to any visitor. Attackers use this to map your API surface before crafting targeted attacks. ` +
+          `Disable introspection in production while keeping it enabled in development.`,
+        aiTools: ["cursor", "copilot", "v0", "bolt", "lovable", "replit"],
+        fixTemplate:
+          `// Disable introspection in production:\nnew ApolloServer({\n` +
+          `  introspection: process.env.NODE_ENV !== 'production',\n` +
+          `  // or for graphql-yoga:\n` +
+          `  // maskedErrors: true, graphiql: process.env.NODE_ENV !== 'production',\n` +
+          `});`,
+      },
+    ];
+  }
+
+  return [];
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
@@ -679,6 +896,10 @@ export function analyzeProjectGraph(files: FileEntry[]): Finding[] {
     ...detectSecretsInClientImports(files),
     ...detectMissingCaptcha(files),
     ...detectMissingSecurityHeaders(files),
+    ...detectStripePriceFromClient(files),
+    ...detectAccountEnumeration(files),
+    ...detectPasswordResetLifecycle(files),
+    ...detectGraphQLIntrospection(files),
   ];
 
   // Deduplicate

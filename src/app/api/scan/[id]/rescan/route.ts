@@ -125,6 +125,7 @@ export async function POST(
           title: f.title,
           description: f.description,
           fixSuggestion: f.fixTemplate,
+          riskCategories: f.riskCategories ?? [],
         })),
       }),
       prisma.scanSummary.create({
