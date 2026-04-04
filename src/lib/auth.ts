@@ -1,9 +1,10 @@
 import NextAuth from "next-auth";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import GitHub from "next-auth/providers/github";
-import Nodemailer from "next-auth/providers/nodemailer";
+import Resend from "next-auth/providers/resend";
 import { prisma } from "@/lib/prisma";
 import { authConfig } from "@/auth.config";
+import { sendWelcome } from "@/lib/resend";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
@@ -16,9 +17,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         params: { scope: "read:user user:email repo" },
       },
     }),
-    Nodemailer({
-      server: process.env.EMAIL_SERVER,
-      from: process.env.EMAIL_FROM ?? "VibeScan <noreply@vibescan.dev>",
+    Resend({
+      apiKey: process.env.RESEND_API_KEY!,
+      from: process.env.EMAIL_FROM ?? "VibeScan <noreply@vibescan.app>",
     }),
   ],
   session: {
@@ -29,8 +30,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (user) {
         token.id = user.id;
       }
-      // Always re-fetch role + orgId from DB so role changes (promotions/demotions)
-      // take effect immediately without requiring the user to sign out.
+      // Always re-fetch from DB so role/tier changes take effect immediately
       if (token.id) {
         const dbUser = await prisma.user.findUnique({
           where: { id: token.id as string },
@@ -38,14 +38,30 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         });
         token.role = dbUser?.role;
         token.orgId = dbUser?.orgId;
+
+        // Fetch org subscription tier separately to avoid relation type issues
+        let tier: string = "FREE";
+        if (dbUser?.orgId) {
+          const org = await prisma.organization.findUnique({
+            where: { id: dbUser.orgId },
+            select: { subscriptionTier: true, stripeCurrentPeriodEnd: true },
+          });
+          const periodEnd = org?.stripeCurrentPeriodEnd ?? null;
+          const isActive = periodEnd ? periodEnd.getTime() > Date.now() : false;
+          tier = isActive ? (org?.subscriptionTier ?? "FREE") : "FREE";
+        }
+        token.tier = tier;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
-        (session.user as { role?: string }).role = token.role as string;
-        (session.user as { orgId?: string | null }).orgId = token.orgId as string | null;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const u = session.user as any;
+        u.role = token.role;
+        u.orgId = token.orgId;
+        u.tier = token.tier;
       }
       return session;
     },
@@ -62,6 +78,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         where: { id: user.id },
         data: { orgId: org.id, role: "ADMIN" },
       });
+      // Welcome email — fire and forget, never block auth
+      sendWelcome(user.email, user.name ?? null).catch(() => {});
     },
   },
 });

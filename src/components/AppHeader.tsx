@@ -5,7 +5,7 @@ import ThemeToggle from "./ThemeToggle";
 interface AppHeaderProps {
   email?: string | null;
   isAdmin?: boolean;
-  nav?: "dashboard" | "scans" | "rules" | "integrations" | "admin";
+  nav?: "dashboard" | "scans" | "rules" | "integrations" | "billing" | "admin";
 }
 
 export default function AppHeader({ email, isAdmin, nav }: AppHeaderProps) {
@@ -40,6 +40,9 @@ export default function AppHeader({ email, isAdmin, nav }: AppHeaderProps) {
           </Link>
           <Link href="/integrations" className={`px-3 py-1.5 rounded-lg ${nav === "integrations" ? "bg-muted text-foreground font-medium" : inactiveLink} text-sm`}>
             Integrations
+          </Link>
+          <Link href="/billing" className={`px-3 py-1.5 rounded-lg ${nav === "billing" ? "bg-muted text-foreground font-medium" : inactiveLink} text-sm`}>
+            Billing
           </Link>
           {isAdmin && (
             <Link href="/admin" className={`px-3 py-1.5 rounded-lg ${nav === "admin" ? "bg-muted text-foreground font-medium" : inactiveLink} text-sm`}>

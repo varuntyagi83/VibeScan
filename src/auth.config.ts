@@ -14,7 +14,9 @@ export const authConfig = {
         nextUrl.pathname === "/" ||
         nextUrl.pathname === "/login" ||
         nextUrl.pathname === "/demo" ||
-        nextUrl.pathname.startsWith("/api/auth");
+        nextUrl.pathname === "/pricing" ||
+        nextUrl.pathname.startsWith("/api/auth") ||
+        nextUrl.pathname.startsWith("/api/webhooks/");
 
       if (isPublic) {
         if (isLoggedIn && nextUrl.pathname === "/login") {

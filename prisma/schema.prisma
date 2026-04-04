@@ -89,13 +89,18 @@ model ConnectedRepo {
 }
 
 model Organization {
-  id               String           @id @default(cuid())
-  name             String
-  slug             String           @unique
-  subscriptionTier SubscriptionTier @default(FREE)
-  users            User[]
-  scans            Scan[]
-  createdAt        DateTime         @default(now())
+  id                   String           @id @default(cuid())
+  name                 String
+  slug                 String           @unique
+  subscriptionTier     SubscriptionTier @default(FREE)
+  // Stripe billing
+  stripeCustomerId     String?          @unique
+  stripeSubscriptionId String?          @unique
+  stripePriceId        String?
+  stripeCurrentPeriodEnd DateTime?
+  users                User[]
+  scans                Scan[]
+  createdAt            DateTime         @default(now())
 }
 
 model Scan {
