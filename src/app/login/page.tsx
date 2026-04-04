@@ -20,7 +20,7 @@ export default function LoginPage() {
     e.preventDefault();
     if (!email) return;
     setLoading("email");
-    await signIn("nodemailer", { email, redirect: false, callbackUrl: "/dashboard" });
+    await signIn("resend", { email, redirect: false, callbackUrl: "/dashboard" });
     setSent(true);
     setLoading(null);
   }

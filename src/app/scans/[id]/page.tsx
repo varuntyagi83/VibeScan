@@ -139,7 +139,7 @@ export default async function ScanResultsPage({
             <Shield className="h-10 w-10 text-green-500 mb-3" />
             <p className="font-semibold text-green-400 text-lg">No vulnerabilities found</p>
             <p className="text-zinc-500 text-sm mt-1">
-              All {scan.fileCount} files passed 26 detection rules
+              All {scan.fileCount} files passed 41 detection rules
             </p>
           </div>
         ) : (

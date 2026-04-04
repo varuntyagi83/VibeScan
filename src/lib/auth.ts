@@ -76,7 +76,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       });
       await prisma.user.update({
         where: { id: user.id },
-        data: { orgId: org.id, role: "ADMIN" },
+        data: { orgId: org.id, role: "MEMBER" },
       });
       // Welcome email — fire and forget, never block auth
       sendWelcome(user.email, user.name ?? null).catch(() => {});

@@ -12,7 +12,17 @@ export async function PATCH(
   }
 
   const { id } = await params;
-  const body = await req.json() as { falsePositive?: boolean; fixed?: boolean };
+  let body: { falsePositive?: boolean; fixed?: boolean };
+  try {
+    const raw = await req.json();
+    if (typeof raw !== "object" || raw === null) throw new Error();
+    body = {
+      ...(typeof raw.falsePositive === "boolean" ? { falsePositive: raw.falsePositive } : {}),
+      ...(typeof raw.fixed === "boolean" ? { fixed: raw.fixed } : {}),
+    };
+  } catch {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
 
   // Verify ownership via the scan relation
   const finding = await prisma.finding.findUnique({

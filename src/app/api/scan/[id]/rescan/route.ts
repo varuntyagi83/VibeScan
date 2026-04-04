@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { checkRateLimit } from "@/lib/rate-limit";
+import { bypassesRateLimit } from "@/lib/super-admin";
 import { getGitHubToken, downloadRepoZip } from "@/lib/github";
 import { scoreFindings } from "@/lib/engine/scorer";
 import { isScannablePath, scanFiles, type FileEntry } from "@/lib/engine/scan-files";
@@ -17,6 +19,14 @@ export async function POST(
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { allowed, retryAfter } = checkRateLimit(session.user.id, 10, 60 * 60 * 1000, bypassesRateLimit(session.user.email));
+  if (!allowed) {
+    return NextResponse.json(
+      { error: `Rate limit exceeded. Try again in ${Math.ceil((retryAfter ?? 60000) / 60000)} minute(s).` },
+      { status: 429, headers: { "Retry-After": String(Math.ceil((retryAfter ?? 60000) / 1000)) } }
+    );
   }
 
   const { id } = await params;
@@ -68,6 +78,8 @@ export async function POST(
     return NextResponse.json({ error: "GitHub not connected" }, { status: 400 });
   }
 
+  const orgId = (session.user as { orgId?: string }).orgId ?? null;
+
   const safeName = scan.name.replace(/[<>"'&\x00-\x1f]/g, "").slice(0, 96);
   const newScan = await prisma.scan.create({
     data: {
@@ -76,6 +88,7 @@ export async function POST(
       sourceRef: scan.sourceRef,
       status: "SCANNING",
       createdById: session.user.id,
+      orgId,
     },
   });
 

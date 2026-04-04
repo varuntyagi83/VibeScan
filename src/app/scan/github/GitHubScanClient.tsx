@@ -236,7 +236,7 @@ export default function GitHubScanClient({ hasRepoScope }: { hasRepoScope: boole
 
               <div className="pt-1 space-y-2">
                 <div className="text-xs text-zinc-600 space-y-0.5">
-                  <p>Scans JS, TS, and Python files · Max 500 files · 26 rules</p>
+                  <p>Scans JS, TS, and Python files · Max 500 files · 41 rules</p>
                   <p>node_modules, .git, dist, build directories are skipped</p>
                 </div>
 

@@ -148,7 +148,7 @@ export default async function OnboardingPage() {
             className="inline-flex items-center gap-1.5 text-zinc-400 hover:text-zinc-200 transition-colors"
           >
             <BookOpen className="h-3.5 w-3.5" />
-            Browse all 26 detection rules
+            Browse all 41 detection rules
           </Link>
           <Link
             href="/integrations"

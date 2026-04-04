@@ -64,6 +64,7 @@ export default async function ScansPage({ searchParams }: { searchParams: Search
   const scans = await prisma.scan.findMany({
     where,
     orderBy,
+    take: 100,
     include: { summary: true },
   });
 

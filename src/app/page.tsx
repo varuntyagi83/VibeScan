@@ -14,7 +14,7 @@ const PRICING_TIERS = [
     features: [
       "10 scans/month",
       "Up to 50 files per scan",
-      "26 detection rules",
+      "41 detection rules",
       "PDF export",
       "3 AI explanations/month",
     ],
@@ -31,7 +31,7 @@ const PRICING_TIERS = [
     features: [
       "Unlimited scans",
       "Up to 500 files per scan",
-      "26 detection rules + AI Deep Scan",
+      "41 detection rules + AI Deep Scan",
       "PDF export",
       "Unlimited AI explanations",
       "PR webhook integration",

@@ -9,14 +9,16 @@ import {
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface ScanSummary {
-  grade: string;
+  grade: string | null;
   riskScore: number;
   criticalCount: number;
   highCount: number;
   mediumCount: number;
   lowCount: number;
   infoCount: number;
-  totalCount: number;
+  totalFindings: number;
+  // legacy alias — some callers use totalCount
+  totalCount?: number;
 }
 
 interface Finding {
@@ -31,7 +33,7 @@ interface Finding {
   description: string;
   aiExplanation: string | null;
   fixSuggestion: string | null;
-  fixTemplate: string | null;
+  fixTemplate?: string | null;
 }
 
 interface ScanReportProps {
@@ -691,7 +693,7 @@ function MethodologyPage() {
           AI coding tools including GitHub Copilot, Cursor, Claude Code, Lovable, and Bolt.
         </Text>
         <Text style={s.methodText}>
-          The scanner covers 26 rules across 6 categories. CRITICAL and HIGH findings receive
+          The scanner covers 41 rules across 6 categories. CRITICAL and HIGH findings receive
           GPT-4.1 powered analysis from a principal security engineer persona — identifying the
           exact attack vector, blast radius, and remediation steps specific to the flagged code.
         </Text>
@@ -706,8 +708,9 @@ function MethodologyPage() {
         <Text style={[s.methodText, { marginTop: 16, color: MID }]}>
           False positive reduction: test files, comment lines, public API paths, and projects
           with middleware-level authentication are automatically excluded or downgraded.
-          Risk score is a weighted severity sum (Critical: 25pts, High: 10pts, Medium: 4pts,
-          Low: 1pt) capped at 100. Grade A ≥ 90, B ≥ 75, C ≥ 60, D ≥ 40, F below 40.
+          Risk score is a weighted severity sum (Critical: 40pts, High: 20pts, Medium: 6pts,
+          Low: 1pt) capped at 100. Grade F if any Critical, D if 3+ High, C if 1+ High,
+          B if 3+ Medium, A otherwise.
         </Text>
       </View>
     </Page>

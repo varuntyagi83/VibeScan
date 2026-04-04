@@ -6,6 +6,9 @@ import type Stripe from "stripe";
 
 export const maxDuration = 30;
 
+// In-process idempotency guard — prevents duplicate processing on Stripe retries
+const processedEventIds = new Set<string>();
+
 // Stripe requires the raw body to verify signatures — must NOT parse as JSON first
 export async function POST(req: NextRequest) {
   const body = await req.text();
@@ -28,6 +31,22 @@ export async function POST(req: NextRequest) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[stripe/webhook] Signature verification failed:", msg);
     return new Response(`Webhook signature invalid: ${msg}`, { status: 400 });
+  }
+
+  // Idempotency: log processed event IDs to avoid double-processing retries
+  // We use a simple in-memory set for the process lifetime; for multi-instance
+  // deployments, upgrade to a DB/Redis-backed idempotency store.
+  if (processedEventIds.has(event.id)) {
+    return new Response(JSON.stringify({ received: true, skipped: "duplicate" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  processedEventIds.add(event.id);
+  // Evict oldest entries if set grows too large (memory guard)
+  if (processedEventIds.size > 5000) {
+    const [first] = processedEventIds;
+    processedEventIds.delete(first);
   }
 
   try {

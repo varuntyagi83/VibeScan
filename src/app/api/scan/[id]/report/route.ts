@@ -2,7 +2,9 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { renderToBuffer } from "@react-pdf/renderer";
+import type { DocumentProps } from "@react-pdf/renderer";
 import { createElement } from "react";
+import type { ReactElement } from "react";
 import { ScanReport } from "@/lib/pdf/ScanReport";
 
 export const dynamic = "force-dynamic";
@@ -48,14 +50,14 @@ export async function GET(
       (a.lineNumber ?? 0) - (b.lineNumber ?? 0)
   );
 
-  const buffer = await renderToBuffer(
-    createElement(ScanReport, { scan, findings: sortedFindings })
-  );
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const element = createElement(ScanReport as any, { scan, findings: sortedFindings }) as ReactElement<DocumentProps>;
+  const buffer = await renderToBuffer(element);
 
   const safeName = scan.name.replace(/[^a-z0-9]/gi, "-").toLowerCase();
   const filename = `vibescan-${safeName}.pdf`;
 
-  return new Response(buffer, {
+  return new Response(buffer as unknown as BodyInit, {
     status: 200,
     headers: {
       "Content-Type": "application/pdf",

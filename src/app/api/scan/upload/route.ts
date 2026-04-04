@@ -46,6 +46,25 @@ export async function POST(req: NextRequest) {
   // Sanitize: strip HTML/control characters, enforce length
   const projectName = rawName.replace(/[<>"'&\x00-\x1f]/g, "").slice(0, 100) || "Uploaded scan";
 
+  const orgId = (session.user as { orgId?: string }).orgId ?? null;
+
+  // Enforce free tier monthly scan quota (10 scans/month)
+  const tier = (session.user as { tier?: string }).tier ?? "FREE";
+  if (tier !== "PRO") {
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    monthStart.setHours(0, 0, 0, 0);
+    const monthlyCount = await prisma.scan.count({
+      where: { createdById: session.user.id, createdAt: { gte: monthStart } },
+    });
+    if (monthlyCount >= 10) {
+      return NextResponse.json(
+        { error: "Free tier limit reached (10 scans/month). Upgrade to Pro for unlimited scans." },
+        { status: 402 }
+      );
+    }
+  }
+
   const scan = await prisma.scan.create({
     data: {
       name: projectName,
@@ -53,6 +72,7 @@ export async function POST(req: NextRequest) {
       sourceRef: file.name,
       status: "SCANNING",
       createdById: session.user.id,
+      orgId,
     },
   });
 

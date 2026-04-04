@@ -56,7 +56,7 @@ function buildReviewBody(
   const total = findings.length;
 
   if (total === 0) {
-    return `## ✅ VibeScan — No issues found\n\n${fileCount} file${fileCount !== 1 ? "s" : ""} · ${linesScanned.toLocaleString()} lines scanned · All 26 rules passed\n\n---\n*[VibeScan](${scanUrl}) — AI code security scanner*`;
+    return `## ✅ VibeScan — No issues found\n\n${fileCount} file${fileCount !== 1 ? "s" : ""} · ${linesScanned.toLocaleString()} lines scanned · All 41 rules passed\n\n---\n*[VibeScan](${scanUrl}) — AI code security scanner*`;
   }
 
   const lines: string[] = [];
@@ -217,9 +217,11 @@ export async function POST(req: Request) {
   });
 
   if (!connected) {
-    return Response.json({ error: "Repo not connected" }, { status: 404 });
+    // Return 200 to avoid leaking which repos are connected
+    return Response.json({ ok: true });
   }
 
+  // Verify signature now that we have the per-repo secret
   if (!verifySignature(body, signature, connected.webhookSecret)) {
     return Response.json({ error: "Invalid signature" }, { status: 401 });
   }

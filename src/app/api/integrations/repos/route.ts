@@ -21,11 +21,13 @@ export async function POST(req: Request) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { owner, repo, failOn } = await req.json() as {
+  const { owner, repo, failOn: rawFailOn } = await req.json() as {
     owner: string;
     repo: string;
     failOn?: string;
   };
+  const VALID_FAIL_ON = ["CRITICAL", "HIGH", "MEDIUM", "LOW"] as const;
+  const failOn = VALID_FAIL_ON.includes(rawFailOn as typeof VALID_FAIL_ON[number]) ? rawFailOn : "HIGH";
 
   if (!owner?.trim() || !repo?.trim()) {
     return NextResponse.json({ error: "owner and repo are required" }, { status: 400 });

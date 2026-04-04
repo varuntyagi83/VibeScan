@@ -8,6 +8,10 @@ export async function POST() {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const role = (session.user as { role?: string }).role;
+  if (role !== "ADMIN") {
+    return NextResponse.json({ error: "Only org admins can manage billing" }, { status: 403 });
+  }
 
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },

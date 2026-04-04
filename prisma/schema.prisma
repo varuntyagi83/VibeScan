@@ -122,6 +122,7 @@ model Scan {
   completedAt    DateTime?
 
   @@index([orgId, status])
+  @@index([createdById])
 }
 
 model Finding {
@@ -145,6 +146,7 @@ model Finding {
   createdAt     DateTime @default(now())
 
   @@index([scanId, severity])
+  @@index([scanId, ruleId])
 }
 
 model ScanSummary {
