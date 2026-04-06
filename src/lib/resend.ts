@@ -12,6 +12,7 @@ function getResend(): Resend {
 }
 
 const FROM = process.env.EMAIL_FROM ?? "VibeScan <noreply@corevisionailabs.com>";
+const APP_URL = process.env.NEXTAUTH_URL ?? "https://vibescan.app";
 
 export async function sendMagicLink(to: string, url: string): Promise<void> {
   await getResend().emails.send({
@@ -74,7 +75,7 @@ export async function sendWelcome(to: string, name: string | null): Promise<void
       that Copilot, Cursor, Lovable, and Bolt introduce — 41 detection rules covering IDOR, auth bypass, injection, secrets exposure, and more.
     </p>
     <p style="color:#a1a1aa;font-size:14px;margin:0 0 24px"><strong style="color:#fafafa">Free plan includes:</strong> 10 scans/month · 500 files per scan · 3 AI explanations</p>
-    <a href="${process.env.NEXTAUTH_URL}/onboarding" style="display:block;background:#dc2626;color:#fafafa;text-decoration:none;text-align:center;padding:14px;border-radius:8px;font-weight:600;font-size:15px">
+    <a href="${APP_URL}/onboarding" style="display:block;background:#dc2626;color:#fafafa;text-decoration:none;text-align:center;padding:14px;border-radius:8px;font-weight:600;font-size:15px">
       Run your first scan →
     </a>
   </div>
@@ -104,7 +105,7 @@ export async function sendSubscriptionConfirmation(to: string, plan: string, per
       You're now on <strong style="color:#fafafa">${plan}</strong>. Unlimited scans, AI Deep Scan, and all future features are unlocked.
     </p>
     <p style="color:#71717a;font-size:12px;margin:0 0 24px">Next billing date: ${periodEnd.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}</p>
-    <a href="${process.env.NEXTAUTH_URL}/dashboard" style="display:block;background:#dc2626;color:#fafafa;text-decoration:none;text-align:center;padding:14px;border-radius:8px;font-weight:600;font-size:15px">
+    <a href="${APP_URL}/dashboard" style="display:block;background:#dc2626;color:#fafafa;text-decoration:none;text-align:center;padding:14px;border-radius:8px;font-weight:600;font-size:15px">
       Go to dashboard →
     </a>
   </div>
