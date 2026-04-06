@@ -6,9 +6,6 @@ import type Stripe from "stripe";
 
 export const maxDuration = 30;
 
-// In-process idempotency guard — prevents duplicate processing on Stripe retries
-const processedEventIds = new Set<string>();
-
 // Stripe requires the raw body to verify signatures — must NOT parse as JSON first
 export async function POST(req: NextRequest) {
   const body = await req.text();
@@ -33,20 +30,15 @@ export async function POST(req: NextRequest) {
     return new Response(`Webhook signature invalid: ${msg}`, { status: 400 });
   }
 
-  // Idempotency: log processed event IDs to avoid double-processing retries
-  // We use a simple in-memory set for the process lifetime; for multi-instance
-  // deployments, upgrade to a DB/Redis-backed idempotency store.
-  if (processedEventIds.has(event.id)) {
+  // DB-backed idempotency — survives deploys and works across multiple instances
+  try {
+    await prisma.processedStripeEvent.create({ data: { id: event.id } });
+  } catch {
+    // Unique constraint violation = already processed; return 200 to stop Stripe retrying
     return new Response(JSON.stringify({ received: true, skipped: "duplicate" }), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
-  }
-  processedEventIds.add(event.id);
-  // Evict oldest entries if set grows too large (memory guard)
-  if (processedEventIds.size > 5000) {
-    const [first] = processedEventIds;
-    processedEventIds.delete(first);
   }
 
   try {
