@@ -189,7 +189,7 @@ function ScanResults({ result }: { result: ScanResult & { scanId: string } }) {
           <Shield className="h-10 w-10 text-green-500 mb-3" />
           <p className="font-semibold text-green-400">No vulnerabilities found</p>
           <p className="text-zinc-500 text-sm mt-1">
-            This code passed all {26} detection rules
+            This code passed all 41 detection rules
           </p>
         </div>
       ) : (
