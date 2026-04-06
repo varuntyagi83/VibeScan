@@ -16,6 +16,9 @@ export async function POST(
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  if (session.user.role === "VIEWER") {
+    return NextResponse.json({ error: "Viewers cannot trigger AI analysis" }, { status: 403 });
+  }
 
   const { allowed, retryAfter } = checkRateLimit(session.user.id, 20, 60 * 60 * 1000, bypassesRateLimit(session.user.email));
   if (!allowed) {
@@ -42,12 +45,12 @@ export async function POST(
     return NextResponse.json({ error: "Scan not complete" }, { status: 400 });
   }
 
-  // Determine limit: super admin + exception holders + ADMINs get unlimited
-  const userRole = (session.user as { role?: string }).role;
+  // Determine limit: super admin + Pro tier + explicit exception holders get unlimited
+  const userTier = session.user.tier ?? "FREE";
   const userExceptions = await prisma.userException
     .findMany({ where: { userId: session.user.id }, select: { feature: true } })
     .then((e) => e.map((x) => x.feature));
-  const isPro = hasUnlimitedAI(session.user.email, userExceptions) || userRole === "ADMIN";
+  const isPro = hasUnlimitedAI(session.user.email, userExceptions) || userTier === "PRO";
   const limit = isPro ? Infinity : FREE_LIMIT;
 
   try {

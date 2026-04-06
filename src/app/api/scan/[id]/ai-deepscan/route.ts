@@ -46,6 +46,9 @@ export async function POST(
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  if (session.user.role === "VIEWER") {
+    return NextResponse.json({ error: "Viewers cannot trigger AI analysis" }, { status: 403 });
+  }
 
   const { allowed, retryAfter } = checkRateLimit(session.user.id, 5, 60 * 60 * 1000, bypassesRateLimit(session.user.email));
   if (!allowed) {
